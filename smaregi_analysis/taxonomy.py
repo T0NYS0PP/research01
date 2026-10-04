@@ -47,13 +47,16 @@ SERIES = [
 ]
 NO_SERIES = "(単独)"
 
-# Words too common to link a product to its successor (colours, garment types, sizes).
+# Words too common to link a product to its successor: colours, garment types, sizes,
+# fabrics/finishes and collaboration partners (a DYC jacket does not replace a DYC samue).
 GENERIC_TOKENS = set(
     """TEE T TANK LS L S SS PO HOODIE ZIP HEAVY HANTEN PANTS WIDE SHORT SHORTS CAP JK JACKET SAMUE DABO KD NEON KIMO NO
     BLACK WHITE NAVY RED BLUE GREEN PINK BEIGE OLIVE GRAY GREY BROWN KHAKI CHARCOAL VANILLA DENIM BAG TOTE PATCH UV SLAB VER
-    M XL XS XXL HIKESHI THE OF X BK WH NV GR DE RS LD SW KN KNIT PT BIG SET""".split()
+    M XL XS XXL HIKESHI THE OF X BK WH NV GR DE RS LD SW KN KNIT PT BIG SET NEW
+    BORO JACQUARD SASHIKO WASH PLAID OPAL RUSTED BOKEH ASA LINEN CHENILLE GLOW REFLECT THERMO PIGMENTDYED
+    DYC GUNDAM ZAKU EVA ULTRA NARUTO SASUKE LAUREN KATSUMATA MILTZ CHINPAN NYCHOS BADMEAW NOPE LUTEN""".split()
 ) | {"半纏", "火消", "火消魂", "ﾌﾞﾗｯｸ", "ﾎﾜｲﾄ", "ﾈｲﾋﾞｰ", "ﾚｯﾄﾞ", "ｶｰｷ", "ｸﾞﾘｰﾝ", "ﾋﾟﾝｸ", "ｸﾞﾚｰ", "ﾅﾁｭﾗﾙ",
-     "ｲｴﾛｰ", "ｽﾗﾌﾞ", "ﾃﾞﾆﾑ", "ﾊﾞｹｯﾄﾊｯﾄ"}
+     "ｲｴﾛｰ", "ｽﾗﾌﾞ", "ﾃﾞﾆﾑ", "ﾊﾞｹｯﾄﾊｯﾄ", "ｺﾞｼﾞﾗ", "ｳﾙﾄﾗ"}
 
 
 def series_of(name: str) -> str:
@@ -67,3 +70,9 @@ def series_of(name: str) -> str:
 def name_tokens(core: str) -> set[str]:
     toks = re.findall(r"[A-Za-z]+|[^\x00-\x7F]+", str(core))
     return {t.upper() for t in toks if len(t) >= 2 and t.upper() not in GENERIC_TOKENS}
+
+
+def compact_name(core: str) -> str:
+    """Name without spaces and NEW/N prefixes, to catch re-registrations like 'LAVENDER ME' -> 'NEW LUTEN LAVENDERME'."""
+    n = re.sub(r"^(NEW|N)\s+", "", str(core).upper().strip())
+    return re.sub(r"[\s\-_()（）]", "", n)

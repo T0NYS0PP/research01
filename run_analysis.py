@@ -6,6 +6,9 @@ Example:
         --curr  商品別売上_20260101-20261004.csv --curr-start 2026-01-01 --curr-end 2026-10-04 \
         --monthly 月別売上_202510.csv 月別売上_202610.csv \
         --out output/
+
+The monthly files must contain all 12 months of the previous year, exported after that
+year closed (a month exported mid-month is caught by a reconciliation check against --prev).
 """
 from __future__ import annotations
 
@@ -16,9 +19,9 @@ from pathlib import Path
 import pandas as pd
 
 from smaregi_analysis.loaders import load_monthly_sales, load_product_sales
-from smaregi_analysis.model import (LABEL_ORDER, brand_table, build_sku_table, compute_styles, dead_skus,
-                                    series_table, stability)
-from smaregi_analysis.params import derive_calendar, resolve_params
+from smaregi_analysis.model import (LABEL_ORDER, STOP_LABELS, brand_table, build_sku_table, compute_styles,
+                                    dead_skus, series_table, stability)
+from smaregi_analysis.params import check_current, check_reconciliation, derive_calendar, resolve_params
 from smaregi_analysis.report import build_report
 
 STYLE_COLUMNS = {
@@ -31,6 +34,25 @@ STYLE_COLUMNS = {
     "gpu": "1点粗利", "t_star": "仮想欠品日", "successor": "後継品番", "direction": "空き枠の行き先",
     "dead_sku": "死に筋SKU数", "dead_stock": "死に筋在庫",
 }
+
+
+SENSITIVITY = {
+    "基準": {}, "ラインを緩く(新作の40%点)": {"Q_LINE": 0.40}, "ラインを厳しく(新作の60%点)": {"Q_LINE": 0.60},
+    "ラインをさらに厳しく(新作の70%点)": {"Q_LINE": 0.70}, "追加発注の基準14日": {"COVER_REORDER": 14},
+    "追加発注の基準30日": {"COVER_REORDER": 30}, "ピーク補正なし": {"PEAK_MULT": 1.0},
+}
+
+
+def headline(st: pd.DataFrame) -> dict:
+    """Shares of own-product sales behind the report's headline statements."""
+    own = st[st.grp != "他社"]
+    total = own.s26.sum()
+    active = own[own.u26 > 0]
+    stop = active[active.label.isin(STOP_LABELS)]
+    remake = own[own.label == "再生産"]
+    return dict(stop_n=int(len(stop)), stop_share=float(stop.s26.sum() / total),
+                remake_n=int(len(remake)), remake_share=float(remake.s26.sum() / total),
+                remake_out_n=int(remake.constrained.sum()), remake_out_share=float(remake[remake.constrained].s26.sum() / total))
 
 
 def main() -> None:
@@ -53,11 +75,18 @@ def main() -> None:
         print(f"wrote {build_report(out, monthly).resolve()}")
         return
     cal = derive_calendar(monthly, args.curr_start, args.curr_end)
-    sk = build_sku_table(load_product_sales(args.prev), load_product_sales(args.curr))
-    P = resolve_params(json.loads(Path(args.params).read_text()) if args.params else None, cal, sk)
+    prev, curr = load_product_sales(args.prev), load_product_sales(args.curr)
+    check_reconciliation(prev, cal)
+    check_current(curr, monthly, cal)
+    sk = build_sku_table(prev, curr)
+    user_params = json.loads(Path(args.params).read_text()) if args.params else {}
+    P = resolve_params(user_params, cal, sk)
 
     st, H, launches = compute_styles(sk, P, cal)
-    ser = series_table(st)
+    sensitivity = {"基準": headline(st)}
+    for name, change in list(SENSITIVITY.items())[1:]:
+        sensitivity[name] = headline(compute_styles(sk, resolve_params({**user_params, **change}, cal, sk), cal)[0])
+    ser = series_table(st, P)
     st = st.join(ser[["direction"]], on="series")
     st["direction"] = st["direction"].fillna("(単独)：新コンセプト or 店主判断")
     if args.stability_runs:
@@ -76,7 +105,8 @@ def main() -> None:
     H.to_csv(out / "break_point_lines.csv", encoding="utf-8-sig")
     st.to_pickle(out / "styles.pkl")
     meta = dict(params=P, window_days=cal.window_days, w_sales=cal.w_sales, w_gp=cal.w_gp, w_units=cal.w_units,
-                peak_mult=cal.peak_mult, start=str(cal.start.date()), end=str(cal.end.date()), n_launch_sample=len(launches))
+                peak_mult=cal.peak_mult, start=str(cal.start.date()), end=str(cal.end.date()), n_launch_sample=len(launches),
+                stability_runs=args.stability_runs, sensitivity=sensitivity)
     (out / "run_meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1, default=float))
 
     counts = st.groupby("label", observed=True).agg(styles=("label", "size"), sales=("s26", "sum"))

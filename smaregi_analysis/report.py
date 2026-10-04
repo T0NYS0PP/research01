@@ -16,7 +16,7 @@ from . import taxonomy as tx
 from .model import LABEL_ORDER, STOP_LABELS
 
 LABEL_HELP = {
-    "再生産": "分岐点ラインを超えて売れているのに在庫が薄い。すぐ追加生産する。",
+    "再生産": "分岐点ラインを超えて売れているのに、欠品している（即手配）か、ピーク前の在庫が3週間分を切っている（追加発注）。在庫は書き出し時点の値。",
     "再生産・復刻（要確認）": "前年は売れていたが欠品で今期の数字が伸びていない。欠品した日を確認して、同型で再生産か刷新版かを決める。",
     "継続・強化": "ラインを超えて在庫も足りている。枠を維持して欠品させない。",
     "アップデート": "需要の土台はあるが勢いが落ちている、または粗利率が低い。デザイン刷新か価格・原価の見直し。",
@@ -62,9 +62,21 @@ def build_report(out_dir: str | Path, monthly: pd.DataFrame) -> Path:
     stop_active = active[active.label.isin(STOP_LABELS)]
     remake = st[st.label == "再生産"]
     check = st[st.label == "再生産・復刻（要確認）"]
-    new = own[own.age == "new"]
+    new = own[(own.age == "new") & (own.u26 > 0)]
     other = st[st.grp == tx.OTHER_GROUP]
+    sens = meta.get("sensitivity", {})
+    base = sens.get("基準", {})
+    line_variants = [v for k, v in sens.items() if k.startswith(("基準", "ライン"))]
+    young = own[(own.age == "young") & (own.u26 > 0)]
     summary = dict(
+        own_total=float(own.s26.sum()), stop_n=base.get("stop_n"), stop_share=base.get("stop_share"),
+        stop_share_max=max((v["stop_share"] for v in line_variants), default=None),
+        stop_n_max=max((v["stop_n"] for v in line_variants), default=None),
+        remake_out_n=base.get("remake_out_n"), remake_out_share=base.get("remake_out_share"),
+        remake_cover_n=(base.get("remake_n", 0) - base.get("remake_out_n", 0)),
+        remake_cover_share=(base.get("remake_share", 0) - base.get("remake_out_share", 0)),
+        young_n=int(len(young)), young_share=float(young.s26.sum() / own.s26.sum()),
+        n_launch_sample=meta.get("n_launch_sample"), stability_runs=meta.get("stability_runs"),
         start=meta["start"], end=meta["end"], window_days=meta["window_days"],
         total26=total26, own26=float(own.s26.sum()), other26=float(other.s26.sum()),
         n_active=int(len(active)), n_styles=int(len(own)),
@@ -73,7 +85,7 @@ def build_report(out_dir: str | Path, monthly: pd.DataFrame) -> Path:
         remake_a=int(remake.detail.str.contains("優先A").sum()), remake_stock=float(remake.stock.sum()),
         check_n=int(len(check)), check_g25=float(check.g25.sum()),
         check_prev_only=int((check.status == "prev_only").sum()),
-        new_n=int(len(new)), new_hit=int((new.E_now >= new.H50).sum()), new_share=float(new.s26.sum() / own.s26.sum()),
+        new_n=int(len(new)), new_share=float(new.s26.sum() / own.s26.sum()),
         own_ratio=float(own.s26.sum() / (own.s25.sum() * w)), other_ratio=float(other.s26.sum() / (other.s25.sum() * w)),
         own_gm25=float(own.g25.sum() / own.s25.sum()), own_gm26=float(own.g26.sum() / own.s26.sum()),
         stop_stock=float(st[st.label == "終売（在庫消化）"].stock.sum()),
@@ -119,8 +131,9 @@ def build_report(out_dir: str | Path, monthly: pd.DataFrame) -> Path:
     dead_rows = _records(dead.join(st[["label"]], on="style").fillna({"label": ""}),
                          ["style", "name", "color", "size", "今期販売点数", "在庫", "在庫日数", "label"])
 
+    sens_rows = [dict(name=k, **v) for k, v in sens.items()]
     data = dict(summary=summary, labels=labels, lines=lines, styles=styles, monthly=monthly_rows,
-                series=series_rows, brands=brand_rows, dead=dead_rows, params=meta["params"])
+                series=series_rows, brands=brand_rows, dead=dead_rows, params=meta["params"], sensitivity=sens_rows)
     template = Path(__file__).with_name("report_template.html").read_text(encoding="utf-8")
     page = template.replace("/*__DATA__*/null", json.dumps(data, ensure_ascii=False, default=_f).replace("</", "<\\/"))
     path = out / "report.html"
