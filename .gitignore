@@ -1,0 +1,8 @@
+# Sales data and generated reports contain business figures: never commit them.
+data/
+output/
+*.csv
+*.xlsx
+__pycache__/
+*.pyc
+.venv/
