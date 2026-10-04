@@ -1,0 +1,411 @@
+<title>品番別 継続・終売判定</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: one working column, summary first, then the line, the action table, and background evidence. */
+:root {
+  --bg: #f4f5f7; --surface: #ffffff; --ink: #15171c; --ink-2: #474c58; --muted: #767c8a;
+  --line: #dde0e6; --line-2: #c6cad3; --accent: #27457a; --accent-soft: #e6ecf6;
+  --s2026: #2a78d6; --s2025: #eb6834;
+  --l-remake: #0b8a0b; --l-check: #b87a00; --l-keep: #2a78d6; --l-update: #4a3aa7; --l-watch: #767c8a;
+  --l-clear: #d1602f; --l-done: #474c58; --l-other: #8a6d3b;
+  --good-ink: #006300; --bad-ink: #b3261e;
+  --font-display: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+  --step--1: 0.8125rem; --step-0: 0.9375rem; --step-1: 1.125rem; --step-2: 1.5rem; --step-3: 2.125rem;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1116; --surface: #171a21; --ink: #eef0f4; --ink-2: #b9bec9; --muted: #8b91a0;
+  --line: #2a2f39; --line-2: #3a404c; --accent: #8fb0e8; --accent-soft: #1d2638;
+  --s2026: #3987e5; --s2025: #d95926;
+  --l-remake: #2fb52f; --l-check: #d9a01c; --l-keep: #5a9be8; --l-update: #9085e9; --l-watch: #8b91a0;
+  --l-clear: #e57a4c; --l-done: #a3a8b4; --l-other: #c4a46a;
+  --good-ink: #3cc23c; --bad-ink: #f07a72; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1116; --surface: #171a21; --ink: #eef0f4; --ink-2: #b9bec9; --muted: #8b91a0;
+  --line: #2a2f39; --line-2: #3a404c; --accent: #8fb0e8; --accent-soft: #1d2638;
+  --s2026: #3987e5; --s2025: #d95926;
+  --l-remake: #2fb52f; --l-check: #d9a01c; --l-keep: #5a9be8; --l-update: #9085e9; --l-watch: #8b91a0;
+  --l-clear: #e57a4c; --l-done: #a3a8b4; --l-other: #c4a46a;
+  --good-ink: #3cc23c; --bad-ink: #f07a72; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.7; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; display: grid; gap: 44px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; line-height: 1.3; text-wrap: balance; margin: 0; }
+h1 { font-size: var(--step-3); letter-spacing: 0.02em; }
+h2 { font-size: var(--step-2); }
+h3 { font-size: var(--step-1); font-family: var(--font-body); }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font-size: var(--step--1); color: var(--muted); letter-spacing: 0.08em; }
+.lede { color: var(--ink-2); }
+section { display: grid; gap: 16px; min-width: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+small, .small { font-size: var(--step--1); }
+
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
+  display: flex; gap: 4px 18px; overflow-x: auto; padding-block: 10px; font-size: var(--step--1); white-space: nowrap; }
+nav.toc a { color: var(--ink-2); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); text-decoration: underline; }
+
+header.top { display: grid; gap: 10px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); font-size: var(--step--1); }
+
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.finding { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.finding .k { font-size: var(--step-2); font-weight: 700; font-variant-numeric: tabular-nums; }
+.finding .t { font-weight: 700; }
+.finding p { color: var(--ink-2); font-size: var(--step--1); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 18px; min-width: 0; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 500; white-space: nowrap; position: sticky; top: 0; background: var(--surface); }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tbody tr:hover { background: var(--accent-soft); }
+th.sortable { cursor: pointer; }
+th.sortable:hover { color: var(--ink); }
+th[aria-sort="ascending"]::after { content: " ▲"; } th[aria-sort="descending"]::after { content: " ▼"; }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 9px;
+  font-size: var(--step--1); white-space: nowrap; color: var(--ink); background: var(--surface); }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); flex: none; }
+.flag { font-size: 0.72rem; border: 1px solid var(--line-2); border-radius: 3px; padding: 0 5px; color: var(--ink-2); margin-left: 4px; white-space: nowrap; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab { font: inherit; font-size: var(--step--1); border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); border-radius: 999px;
+  padding: 4px 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.tab::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); }
+.tab[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); font-weight: 700; }
+.tab:focus-visible, input:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tab .n { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+input[type="search"] { font: inherit; font-size: var(--step--1); padding: 6px 10px; border: 1px solid var(--line-2); border-radius: 6px;
+  background: var(--surface); color: var(--ink); min-width: 0; width: 240px; max-width: 100%; }
+.label-help { color: var(--ink-2); font-size: var(--step--1); }
+
+.ratio { display: grid; grid-template-columns: 76px auto; gap: 8px; align-items: center; }
+.ratio .bar { position: relative; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.ratio .fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.ratio .tick { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); left: 33.33%; }
+.ratio .v { font-variant-numeric: tabular-nums; min-width: 3.5em; text-align: right; }
+.reason { min-width: 220px; max-width: 420px; color: var(--ink-2); }
+.name { min-width: 150px; }
+.name .s { color: var(--muted); font-size: 0.72rem; }
+
+.bars { display: grid; gap: 8px; }
+.bars .row { display: grid; grid-template-columns: minmax(130px, 200px) 1fr 160px; gap: 12px; align-items: center; font-size: var(--step--1); }
+.bars .track { height: 14px; position: relative; }
+.bars .seg { position: absolute; inset: 0 auto 0 0; border-radius: 0 4px 4px 0; background: var(--c); min-width: 2px; }
+.bars .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .grid line { stroke: var(--line); stroke-width: 1; }
+.chart .axis text { fill: var(--muted); font-size: 11px; font-family: var(--font-body); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--step--1); color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 16px; height: 2px; background: var(--c); display: inline-block; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 10px;
+  font-size: var(--step--1); box-shadow: 0 4px 14px rgba(0,0,0,.12); min-width: 160px; z-index: 3; }
+.tip .row { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.steps .panel { display: grid; gap: 6px; align-content: start; }
+.steps .panel b { font-size: var(--step-0); }
+.steps .panel p { font-size: var(--step--1); color: var(--ink-2); }
+.formula { font-size: var(--step--1); background: var(--accent-soft); border-radius: 6px; padding: 10px 14px; color: var(--ink); max-width: 80ch; }
+ul.notes { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 80ch; color: var(--ink-2); }
+details summary { cursor: pointer; color: var(--accent); font-size: var(--step--1); }
+.up { color: var(--good-ink); } .down { color: var(--bad-ink); }
+@media (max-width: 640px) {
+  .bars .row { grid-template-columns: 1fr; gap: 4px; }
+  .bars .val { text-align: left; }
+  h1 { font-size: var(--step-2); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<nav class="toc" aria-label="目次">
+  <a href="#summary">結論</a><a href="#line">分岐点のしくみ</a><a href="#actions">品番別の判定</a>
+  <a href="#series">シリーズ</a><a href="#trend">店全体の推移</a><a href="#brands">他社ブランド</a>
+  <a href="#sku">死に筋SKU</a><a href="#notes">注意点</a>
+</nav>
+
+<main class="wrap">
+  <header class="top">
+    <div class="eyebrow">スマレジ 商品別売上・月別売上より</div>
+    <h1>品番別 継続・終売判定</h1>
+    <div class="meta-row" id="metaRow"></div>
+  </header>
+
+  <section id="summary" aria-labelledby="h-summary">
+    <h2 id="h-summary">結論</h2>
+    <div class="findings" id="findings"></div>
+    <div class="panel">
+      <h3>判定ごとの今期売上シェア</h3>
+      <p class="small muted" style="margin-bottom:12px">2026年の商品売上（税抜、他社ブランドを含む）に占める割合。右は品番数（うち今期販売あり）。</p>
+      <div class="bars" id="labelBars"></div>
+    </div>
+  </section>
+
+  <section id="line" aria-labelledby="h-line">
+    <h2 id="h-line">販売をやめる分岐点のしくみ</h2>
+    <p class="lede">「この商品の棚と生産枠を、典型的な新商品に渡したら、もっと粗利を稼げるか」で判定します。今年発売した新商品が同じ期間に稼いだ粗利の中央値を、棚ごとの<b>分岐点ライン</b>とします。既存品の粗利がこのラインを下回ると、新商品に入れ替えたほうが半分以上の確率で得になります。</p>
+    <div class="steps">
+      <div class="panel"><b>1. 同じ物差しにそろえる</b><p>今期（1/1〜<span data-k="endmd"></span>）の粗利で比べます。冬に売れるフーディ類は季節補正をかけ、前年分は同じ期間の割合に換算します。</p></div>
+      <div class="panel"><b>2. 欠品を見抜く</b><p>売れ筋のサイズ・色が切れている品番は「売れなかった」のではなく「売る物がなかった」ので、前年の実績も使って判定します。</p></div>
+      <div class="panel"><b>3. やめる前に救えるか確かめる</b><p>前年はラインを超えていたならデザイン刷新、+15%以内の値上げで届くなら価格・原価の見直し。どれでも届かないときだけ終売にします。</p></div>
+    </div>
+    <div class="formula">終売の条件 ＝ 今期の粗利 &lt; ライン　かつ　前年の粗利（同期間換算）&lt; ライン　かつ　刷新・値上げでも届かない　かつ　新商品・前年後半投入の冬物ではない</div>
+    <div class="panel scroll">
+      <h3 style="margin-bottom:8px">棚ごとの分岐点ライン</h3>
+      <table id="linesTable"></table>
+      <p class="small muted" style="margin-top:10px">ライン＝今年の新商品の初期粗利の中央値（Harrell–Davis推定、新商品が少ない棚は価格帯モデルで補強）。80%区間はブートストラップで推定した不確かさ。月あたり販売数は、棚の1点粗利の中央値で割った目安。</p>
+    </div>
+  </section>
+
+  <section id="actions" aria-labelledby="h-actions">
+    <h2 id="h-actions">品番別の判定</h2>
+    <div class="toolbar">
+      <div class="tabs" id="tabs" role="group" aria-label="判定で絞り込む"></div>
+      <input type="search" id="q" placeholder="商品名・品番・シリーズで検索" aria-label="商品名・品番・シリーズで検索">
+    </div>
+    <p class="label-help" id="labelHelp"></p>
+    <div class="panel scroll" style="padding:0">
+      <table id="styleTable"></table>
+    </div>
+    <p class="small muted">ライン比＝今期の判定粗利 ÷ 分岐点ライン。棒の縦線が1.0×（ライン）で、3×以上は右端で止めています。「境界」はラインの±15%以内、安定度は販売数を揺らして200回再判定したとき同じ判定になった割合。</p>
+  </section>
+
+  <section id="series" aria-labelledby="h-series">
+    <h2 id="h-series">シリーズの健全度：空いた枠をどこに回すか</h2>
+    <p class="lede">終売や刷新で空いた枠を、同じシリーズの新柄に回すか、新しいコンセプトに回すかの目安です。健全度は、在庫があった継続品が同じ棚の平均と比べてどれだけ売れたか（1.0＝棚並み）。</p>
+    <div class="panel scroll"><table id="seriesTable"></table></div>
+  </section>
+
+  <section id="trend" aria-labelledby="h-trend">
+    <h2 id="h-trend">店全体の推移</h2>
+    <p class="lede" id="trendLede"></p>
+    <div class="panel">
+      <div class="legend" id="trendLegend"></div>
+      <div class="chart" id="trendChart"></div>
+    </div>
+    <div class="panel scroll"><table id="yoyTable"></table></div>
+  </section>
+
+  <section id="brands" aria-labelledby="h-brands">
+    <h2 id="h-brands">他社ブランド（部門ETC1）</h2>
+    <p class="lede">原価が0円で登録されているため、粗利では判定していません。委託なら掛率、買取なら仕入値を登録すると、自社品と同じラインで評価できます。</p>
+    <div class="panel scroll"><table id="brandTable"></table></div>
+  </section>
+
+  <section id="sku" aria-labelledby="h-sku">
+    <h2 id="h-sku">死に筋SKU（色・サイズ）</h2>
+    <p class="lede">品番としては売れているのに、特定の色・サイズだけ在庫が残っているもの。次回の生産から外し、残りは値下げで消化します。</p>
+    <div class="panel scroll"><table id="deadTable"></table></div>
+  </section>
+
+  <section id="notes" aria-labelledby="h-notes">
+    <h2 id="h-notes">注意点と、精度を上げるために欲しいデータ</h2>
+    <ul class="notes">
+      <li>商品別の月次データがないため、発売時期は品番の連番から、欠品した時期は「仮想欠品日」で推定しています。<b>要確認</b>の品番は、スマレジの在庫履歴で実際に欠品した日を見て判断してください。仮想欠品日より前に欠品していれば、前年以上に売れていたことになります。</li>
+      <li>在庫は書き出し時点（<span data-k="end"></span>）の値です。最近入荷した品番は「在庫があるのに売れていない」ように見えることがあります。</li>
+      <li>ラインには統計的な揺れがあります。とくにキッズ・スウェット・小物は今年の新商品が少なく、価格帯モデルで補っています。「境界」フラグと安定度が低い品番は、人の目で確認してください。</li>
+      <li>新商品の開発費・最小ロット・在庫を持つコストは計算に入れていません。新商品の粗利を年換算せずに比べているので、既存品に有利な（やめにくい）判定になっています。</li>
+      <li>コラボ・ライセンス品や限定品は、商品名のキーワードで見分けています。契約期限やロイヤリティ率は反映していません。</li>
+    </ul>
+    <details>
+      <summary>精度を上げるために書き出してほしいデータ</summary>
+      <ul class="notes" style="margin-top:8px">
+        <li>商品別売上を<b>月ごと</b>に（2024年1月〜）。品番ごとの季節性・発売月・欠品月を直接測れます。</li>
+        <li>在庫変動履歴（入荷日・入荷数）。欠品日数と本当の消化率がわかり、「要確認」を自動で判定できます。</li>
+        <li>売上0のSKUも含む在庫一覧。死に筋在庫の見落としを減らせます。</li>
+        <li>商品マスタ（登録日、定価、旧品番と新品番の対応、コラボ区分）と、生産のリードタイム・最小ロット。</li>
+        <li>他社ブランドの掛率（または仕入値）。</li>
+      </ul>
+    </details>
+  </section>
+</main>
+
+<script>
+const DATA = /*__DATA__*/null;
+const LABEL_COLOR = {"再生産":"--l-remake","再生産・復刻（要確認）":"--l-check","継続・強化":"--l-keep","アップデート":"--l-update",
+  "様子見":"--l-watch","終売（在庫消化）":"--l-clear","終売済み":"--l-done","他社ブランド別管理":"--l-other"};
+const AGE = {new:"新商品", young:"前年後半投入", mature:"成熟品"};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const man = v => v == null ? "–" : (v / 10000).toLocaleString("ja-JP", {maximumFractionDigits: v >= 1e6 ? 0 : 1}) + "万円";
+const yen = v => v == null ? "–" : "¥" + Math.round(v).toLocaleString("ja-JP");
+const pct = (v, d = 1) => v == null ? "–" : (v * 100).toFixed(d) + "%";
+const int = v => v == null ? "–" : Math.round(v).toLocaleString("ja-JP");
+const chip = l => `<span class="chip" style="--c:var(${LABEL_COLOR[l] || "--muted"})">${esc(l)}</span>`;
+const S = DATA.summary;
+
+document.querySelectorAll('[data-k="endmd"]').forEach(e => e.textContent = S.end.slice(5).replace("-", "/"));
+document.querySelectorAll('[data-k="end"]').forEach(e => e.textContent = S.end);
+document.getElementById("metaRow").innerHTML =
+  `<span>判定期間 ${esc(S.start)} 〜 ${esc(S.end)}（${S.window_days}日）</span><span>比較：${S.start.slice(0,4) - 1}年 通年</span>` +
+  `<span>自社 ${S.n_styles} 品番（今期販売 ${S.n_active}）＋他社ブランド</span>`;
+
+// ---- findings
+const F = [
+  {k: pct(S.stop_active_share), t: "やめるべき品番は売上の一部だけ",
+   p: `今期に売れた自社${S.n_active}品番のうち、終売判定は${S.stop_active_n}品番。合わせても売上の${pct(S.stop_active_share)}です。品番を減らしても売上はほとんど減りません。`},
+  {k: pct(S.remake_share), t: "本当の課題は売れ筋の在庫切れ",
+   p: `「再生産」${S.remake_n}品番が売上の${pct(S.remake_share)}を占め、そのうち${S.remake_a}品番は新商品の上位25%より稼ぐ優先A。どれも欠品中か、ピーク時の在庫が3週間分を切っています。さらに${S.check_n}品番は前年に売れていたのに欠品しています（前年粗利 ${man(S.check_g25)}）。`},
+  {k: `${S.new_hit}/${S.new_n}`, t: `新商品の${Math.round(S.new_hit / S.new_n * 100)}%がすでにラインを超えた`,
+   p: `今年発売の新商品${S.new_n}品番のうち${S.new_hit}品番がすでに分岐点ラインを超え、自社売上の${pct(S.new_share)}を稼いでいます。新商品づくりは機能しています。`},
+  {k: `${(S.own_ratio * 100 - 100).toFixed(1)}%`, t: "店の伸びは他社ブランド頼み",
+   p: `同じ期間で比べると、自社品の売上は前年比${(S.own_ratio * 100 - 100).toFixed(1)}%でほぼ横ばい、粗利率も${pct(S.own_gm25)}→${pct(S.own_gm26)}です。店全体の伸びは他社ブランド（前年同期の${S.other_ratio.toFixed(1)}倍）によるものです。`},
+];
+document.getElementById("findings").innerHTML = F.map(f =>
+  `<div class="finding"><div class="k">${esc(f.k)}</div><div class="t">${esc(f.t)}</div><p>${f.p}</p></div>`).join("");
+
+// ---- label bars
+const maxShare = Math.max(...DATA.labels.map(l => l.share));
+document.getElementById("labelBars").innerHTML = DATA.labels.map(l =>
+  `<div class="row"><div>${chip(l.label)}</div><div class="track"><div class="seg" style="--c:var(${LABEL_COLOR[l.label]});width:${(l.share / maxShare * 100).toFixed(1)}%"></div></div>` +
+  `<div class="val">${pct(l.share)}　${l.n}品番（${l.n_active}）</div></div>`).join("");
+
+// ---- lines table
+document.getElementById("linesTable").innerHTML =
+  `<thead><tr><th>棚</th><th class="r">分岐点ライン</th><th class="r">年換算</th><th class="r">月あたり販売数</th><th class="r">即時値下げライン</th><th class="r">優先Aライン</th><th class="r">80%区間</th><th class="r">新商品数</th><th class="r">今期販売品番</th></tr></thead><tbody>` +
+  DATA.lines.map(r => `<tr><td>${esc(r.grp)}</td><td class="r"><b>${man(r.H50)}</b></td><td class="r">${man(r.annual)}</td>` +
+    `<td class="r">${r.per_month == null ? "–" : r.per_month.toFixed(1) + " 点"}</td><td class="r">${man(r.H25)}</td><td class="r">${man(r.H75)}</td>` +
+    `<td class="r">${r.p10 == null ? "–" : man(r.p10) + "〜" + man(r.p90)}</td><td class="r">${r.n}</td><td class="r">${r.n_styles}</td></tr>`).join("") + "</tbody>";
+
+// ---- style table with tabs, search, sort
+const LABELS = DATA.labels.map(l => l.label);
+let state = {label: "再生産", q: "", sort: "s26", dir: -1};
+try { const saved = JSON.parse(localStorage.getItem("styleTab") || "null"); if (saved && (saved === "すべて" || LABELS.includes(saved))) state.label = saved; } catch (e) {}
+const tabs = document.getElementById("tabs");
+function renderTabs() {
+  const counts = Object.fromEntries(DATA.labels.map(l => [l.label, l.n]));
+  tabs.innerHTML = ["すべて", ...LABELS].map(l =>
+    `<button class="tab" type="button" id="tab-${LABELS.indexOf(l)}" data-l="${esc(l)}" aria-pressed="${state.label === l}" style="--c:var(${LABEL_COLOR[l] || "--ink-2"})">${esc(l)} <span class="n">${l === "すべて" ? DATA.styles.length : counts[l]}</span></button>`).join("");
+}
+tabs.addEventListener("click", e => {
+  const b = e.target.closest(".tab"); if (!b) return;
+  state.label = b.dataset.l; try { localStorage.setItem("styleTab", JSON.stringify(state.label)); } catch (err) {}
+  renderTabs(); renderTable();
+});
+document.getElementById("q").addEventListener("input", e => { state.q = e.target.value.trim().toLowerCase(); renderTable(); });
+
+const COLS = [
+  {k: "style_name", h: "品番・商品名", f: r => `<div class="name">${esc(r.style_name)}<div class="s">${esc(r.style)}${r.series && r.series !== "(単独)" ? "・" + esc(r.series) : ""}・${AGE[r.age] || ""}</div></div>`},
+  {k: "label", h: "判定", f: r => chip(r.label) + (r.border ? '<span class="flag">境界</span>' : "")},
+  {k: "grp", h: "棚", f: r => `<span style="white-space:nowrap">${esc(r.grp)}</span>`},
+  {k: "s26", h: "今期売上", r: 1, f: r => man(r.s26)},
+  {k: "line_ratio", h: "ライン比", f: r => ratioCell(r)},
+  {k: "E_prev", h: "前年粗利(同期換算)", r: 1, f: r => r.label === "他社ブランド別管理" ? "–" : man(r.E_prev)},
+  {k: "stock", h: "在庫", r: 1, f: r => int(r.stock) + (r.cover_peak != null && r.stock > 0 && r.cover_peak < 400 ? `<div class="small muted">${Math.round(r.cover_peak)}日分</div>` : "")},
+  {k: "detail", h: "理由・アクション", f: r => `<div class="reason">${esc(r.detail)}${r.successor && r.label === "終売済み" ? `<div class="small muted">後継：${esc(r.successor)}</div>` : ""}</div>`},
+  {k: "stab", h: "安定度", r: 1, f: r => r.stab == null ? "–" : pct(r.stab, 0)},
+];
+function ratioCell(r) {
+  if (r.label === "他社ブランド別管理" || r.line_ratio == null) return '<span class="muted">–</span>';
+  const v = r.line_ratio, w = Math.max(0, Math.min(v / 3, 1)) * 100;
+  const c = v >= 1 ? "var(--l-keep)" : "var(--l-clear)";
+  return `<div class="ratio"><div class="bar"><div class="fill" style="width:${w.toFixed(1)}%;background:${c}"></div><div class="tick"></div></div><span class="v">${v.toFixed(v >= 10 ? 0 : 2)}×</span></div>`;
+}
+const table = document.getElementById("styleTable");
+table.addEventListener("click", e => {
+  const th = e.target.closest("th.sortable"); if (!th) return;
+  const k = th.dataset.k; state.dir = state.sort === k ? -state.dir : -1; state.sort = k; renderTable();
+});
+table.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("th.sortable")) { e.preventDefault(); e.target.click(); } });
+function renderTable() {
+  const L = state.label, q = state.q;
+  let rows = DATA.styles.filter(r => (L === "すべて" || r.label === L) &&
+    (!q || [r.style_name, r.style, r.series, r.grp].join(" ").toLowerCase().includes(q)));
+  const k = state.sort, d = state.dir;
+  rows.sort((a, b) => { const x = a[k], y = b[k]; if (x == null) return 1; if (y == null) return -1; return (x > y ? 1 : x < y ? -1 : 0) * d; });
+  document.getElementById("labelHelp").textContent = L === "すべて" ? `全${rows.length}品番。` :
+    (DATA.labels.find(l => l.label === L).help + `（${rows.length}品番）`);
+  table.innerHTML = "<thead><tr>" + COLS.map(c => `<th class="sortable${c.r ? " r" : ""}" tabindex="0" data-k="${c.k}"${state.sort === c.k ? ` aria-sort="${d > 0 ? "ascending" : "descending"}"` : ""}>${c.h}</th>`).join("") +
+    "</tr></thead><tbody>" + (rows.length ? rows.map(r => "<tr>" + COLS.map(c => `<td${c.r ? ' class="r"' : ""}>${c.f(r)}</td>`).join("") + "</tr>").join("")
+    : `<tr><td colspan="${COLS.length}" class="muted">該当する品番はありません。</td></tr>`) + "</tbody>";
+}
+renderTabs(); renderTable();
+
+// ---- series
+document.getElementById("seriesTable").innerHTML =
+  `<thead><tr><th>シリーズ</th><th class="r">前年売上</th><th class="r">今期売上</th><th class="r">健全度</th><th class="r">今期販売品番</th><th class="r">新作（うちライン超え）</th><th>空いた枠の行き先</th></tr></thead><tbody>` +
+  DATA.series.map(r => `<tr><td>${esc(r.series)}</td><td class="r">${man(r.s25)}</td><td class="r">${man(r.s26)}</td>` +
+    `<td class="r">${r.FI_instock == null ? "–" : r.FI_instock.toFixed(2)}</td><td class="r">${r.n_active}</td>` +
+    `<td class="r">${r.n_new_or_young}（${r.new_hits}）</td><td>${esc(r.direction)}</td></tr>`).join("") + "</tbody>";
+
+// ---- brands
+document.getElementById("brandTable").innerHTML =
+  `<thead><tr><th>ブランド</th><th class="r">コード数</th><th class="r">前年売上</th><th class="r">今期売上</th><th class="r">前年同期比</th><th class="r">今期売上シェア</th></tr></thead><tbody>` +
+  DATA.brands.map(r => `<tr><td>${esc(r.brand)}</td><td class="r">${r.codes}</td><td class="r">${man(r.s25)}</td><td class="r">${man(r.s26)}</td>` +
+    `<td class="r">${r.same_window_ratio == null ? "新規" : r.same_window_ratio.toFixed(2) + "倍"}</td><td class="r">${pct(r.share26)}</td></tr>`).join("") + "</tbody>";
+
+// ---- dead SKUs
+document.getElementById("deadTable").innerHTML = DATA.dead.length ?
+  `<thead><tr><th>品番</th><th>商品名</th><th>カラー</th><th>サイズ</th><th class="r">今期販売</th><th class="r">在庫</th><th class="r">在庫日数</th><th>品番の判定</th></tr></thead><tbody>` +
+  DATA.dead.map(r => `<tr><td>${esc(r.style)}</td><td>${esc(r.name)}</td><td>${esc(r.color)}</td><td>${esc(r.size)}</td><td class="r">${int(r["今期販売点数"])}</td>` +
+    `<td class="r">${int(r["在庫"])}</td><td class="r">${r["在庫日数"] == null ? "販売なし" : int(r["在庫日数"]) + "日"}</td><td>${r.label ? chip(r.label) : ""}</td></tr>`).join("") + "</tbody>"
+  : "<tbody><tr><td class='muted'>該当なし</td></tr></tbody>";
+
+// ---- monthly trend
+(function () {
+  const M = DATA.monthly;
+  const curY = +S.start.slice(0, 4), prevY = curY - 1;
+  const byYM = Object.fromEntries(M.map(r => [r.ym, r]));
+  const mm = Array.from({length: 12}, (_, i) => String(i + 1).padStart(2, "0"));
+  const endM = +S.end.slice(5, 7), endD = +S.end.slice(8, 10);
+  const daysIn = (y, m) => new Date(y, m, 0).getDate();
+  const cur = mm.map((m, i) => { const r = byYM[`${curY}-${m}`]; if (!r || i + 1 > endM) return null;
+    return i + 1 === endM && endD < daysIn(curY, endM) ? null : r.sales; });
+  const prev = mm.map(m => (byYM[`${prevY}-${m}`] || {}).sales ?? null);
+  const series = [{name: `${curY}年`, c: "--s2026", v: cur}, {name: `${prevY}年`, c: "--s2025", v: prev}];
+  document.getElementById("trendLegend").innerHTML = series.map(s => `<span><i style="--c:var(${s.c})"></i>${s.name} 純売上（税抜）</span>`).join("");
+  const W = 760, H = 280, P = {l: 56, r: 16, t: 14, b: 30};
+  const all = [...cur, ...prev].filter(v => v != null), ymax = Math.ceil(Math.max(...all) / 5e6) * 5e6;
+  const x = i => P.l + i * (W - P.l - P.r) / 11, y = v => P.t + (1 - v / ymax) * (H - P.t - P.b);
+  const ticks = []; for (let v = 0; v <= ymax; v += 5e6) ticks.push(v);
+  const path = v => v.map((d, i) => d == null ? null : [x(i), y(d)]).reduce((acc, p) => {
+    if (!p) { acc.pen = false; return acc; } acc.s += (acc.pen ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); acc.pen = true; return acc; }, {s: "", pen: false}).s;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="月別純売上 ${curY}年と${prevY}年">`;
+  svg += `<g class="grid">${ticks.map(t => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}"/>`).join("")}</g>`;
+  svg += `<g class="axis">${ticks.map(t => `<text x="${P.l - 8}" y="${y(t) + 4}" text-anchor="end">${t / 1e6}百万</text>`).join("")}` +
+         `${mm.map((m, i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle">${+m}月</text>`).join("")}</g>`;
+  series.slice().reverse().forEach(s => {
+    svg += `<path d="${path(s.v)}" fill="none" stroke="var(${s.c})" stroke-width="2" stroke-linejoin="round"/>`;
+    s.v.forEach((d, i) => { if (d != null) svg += `<circle cx="${x(i)}" cy="${y(d)}" r="3.5" fill="var(${s.c})" stroke="var(--surface)" stroke-width="2"/>`; });
+  });
+  svg += `<line id="xh" y1="${P.t}" y2="${H - P.b}" stroke="var(--line-2)" stroke-width="1" visibility="hidden"/>`;
+  svg += `<rect x="${P.l}" y="${P.t}" width="${W - P.l - P.r}" height="${H - P.t - P.b}" fill="transparent" id="hit"/></svg>`;
+  const box = document.getElementById("trendChart"); box.innerHTML = svg + `<div class="tip" hidden id="tip"></div>`;
+  const svgEl = box.querySelector("svg"), tip = box.querySelector("#tip"), xh = box.querySelector("#xh");
+  function show(evt) {
+    const r = svgEl.getBoundingClientRect(), sx = (evt.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(11, Math.round((sx - P.l) / ((W - P.l - P.r) / 11))));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("visibility", "visible");
+    const yoy = cur[i] != null && prev[i] ? (cur[i] / prev[i] - 1) : null;
+    tip.innerHTML = `<b>${i + 1}月</b>` + series.map(s => `<div class="row"><span>${s.name}</span><span>${man(s.v[i])}</span></div>`).join("") +
+      (yoy == null ? "" : `<div class="row"><span>前年比</span><span class="${yoy >= 0 ? "up" : "down"}">${yoy >= 0 ? "+" : ""}${(yoy * 100).toFixed(1)}%</span></div>`);
+    tip.hidden = false;
+    const px = x(i) * r.width / W, bw = box.clientWidth;
+    tip.style.left = Math.min(Math.max(px + 12, 0), bw - tip.offsetWidth - 4) + "px"; tip.style.top = "8px";
+  }
+  svgEl.addEventListener("pointermove", show);
+  svgEl.addEventListener("pointerleave", () => { tip.hidden = true; xh.setAttribute("visibility", "hidden"); });
+
+  const rows = mm.map((m, i) => ({m: i + 1, c: byYM[`${curY}-${m}`], p: byYM[`${prevY}-${m}`]})).filter(r => r.c && r.p && r.m < endM);
+  const ch = (a, b) => { if (a == null || !b) return "–"; const v = a / b - 1; return `<span class="${v >= 0 ? "up" : "down"}">${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%</span>`; };
+  document.getElementById("yoyTable").innerHTML = `<thead><tr><th>月</th><th class="r">純売上 前年比</th><th class="r">取引数 前年比</th><th class="r">客単価 ${curY}</th><th class="r">客単価 前年比</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td>${r.m}月</td><td class="r">${ch(r.c.sales, r.p.sales)}</td><td class="r">${ch(r.c.tx, r.p.tx)}</td><td class="r">${yen(r.c.aov)}</td><td class="r">${ch(r.c.aov, r.p.aov)}</td></tr>`).join("") + "</tbody>";
+  const sum = (arr, k) => arr.reduce((a, r) => a + (r[k] || 0), 0);
+  const C = rows.map(r => r.c), Pp = rows.map(r => r.p);
+  const sy = sum(C, "sales") / sum(Pp, "sales") - 1, ty = sum(C, "tx") / sum(Pp, "tx") - 1;
+  document.getElementById("trendLede").textContent =
+    `1〜${endM - 1}月の純売上は前年比${sy >= 0 ? "+" : ""}${(sy * 100).toFixed(1)}%、取引数は${ty >= 0 ? "+" : ""}${(ty * 100).toFixed(1)}%。` +
+    (ty <= 0.01 && sy > ty ? "取引数は伸びておらず、売上の伸びは客単価の上昇によるものです。" : "") +
+    (rows.length >= 2 && rows.slice(-2).every(r => r.c.tx < r.p.tx) ? `直近の${rows[rows.length - 2].m}〜${rows[rows.length - 1].m}月は取引数が前年を下回っています。` : "");
+})();
+</script>

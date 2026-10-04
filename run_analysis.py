@@ -19,6 +19,7 @@ from smaregi_analysis.loaders import load_monthly_sales, load_product_sales
 from smaregi_analysis.model import (LABEL_ORDER, brand_table, build_sku_table, compute_styles, dead_skus,
                                     series_table, stability)
 from smaregi_analysis.params import derive_calendar, resolve_params
+from smaregi_analysis.report import build_report
 
 STYLE_COLUMNS = {
     "style_name": "商品名", "dept": "部門", "grp": "棚グループ", "series": "シリーズ", "label": "判定",
@@ -42,11 +43,15 @@ def main() -> None:
     ap.add_argument("--out", default="output")
     ap.add_argument("--params", help="上書きするパラメータのJSONファイル")
     ap.add_argument("--stability-runs", type=int, default=200)
+    ap.add_argument("--report-only", action="store_true", help="既存の出力からレポートだけ作り直す")
     args = ap.parse_args()
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     monthly = load_monthly_sales(args.monthly)
+    if args.report_only:
+        print(f"wrote {build_report(out, monthly).resolve()}")
+        return
     cal = derive_calendar(monthly, args.curr_start, args.curr_end)
     sk = build_sku_table(load_product_sales(args.prev), load_product_sales(args.curr))
     P = resolve_params(json.loads(Path(args.params).read_text()) if args.params else None, cal, sk)
@@ -77,7 +82,7 @@ def main() -> None:
     counts = st.groupby("label", observed=True).agg(styles=("label", "size"), sales=("s26", "sum"))
     counts["sales_share"] = counts["sales"] / st["s26"].sum()
     print(counts.round(3).to_string())
-    print(f"\nwrote {out.resolve()}")
+    print(f"\nwrote {out.resolve()} (report: {build_report(out, monthly).name})")
 
 
 if __name__ == "__main__":
