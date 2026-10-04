@@ -24,12 +24,14 @@ DEFAULT_PARAMS: dict = dict(
     YOUNG_PCT=0.80,         # 連番が前年販売コードの上位20%なら「前年後半投入」
     LATE_RATIO=None,        # 今期/前年の売上比がこれ以上でも「前年後半投入」。None なら w/(1-w)
     NEW_RECENT_PCT=0.80,    # 今期の新コードのうち連番が上位20%は発売直後の可能性が高い
+    NEWPCT_MIN_CODES=5,     # ↑の順位は、同じ接頭辞の新コードがこの数以上あるときだけ使う
     # --- break-point line (新商品ライン) ----------------------------------------------
     Q_LINE=0.50,            # 分岐点ライン＝新商品の初期粗利の中央値
     Q_LOW=0.25,             # 即時値下げライン
     Q_HIGH=0.75,            # 再生産の優先Aライン
     SHRINK_K=5,             # 新商品が少ない棚を価格帯モデルに寄せる擬似件数
-    MIN_LAUNCH_FIT=5,       # 価格帯モデルを区分(アパレル/雑貨)別に当てる最低件数
+    MIN_LAUNCH_FIT=5,       # 価格帯モデルの傾きを区分(アパレル/雑貨)別に推定する最低件数
+    MIN_CLASS_LAUNCHES=3,   # 区分の新商品がこれ未満なら価格帯モデルを使わず既存品の分布を基準にする
     PRICE_ADJ=True,         # 棚の平均より安い商品は、同じ価格帯の新作が稼ぐ粗利と比べる（ラインを下げる）
     PRICE_ADJ_CLIP=(0.6, 1.0),  # 高い商品のラインは上げない（やめる判定を増やさない側に倒す）
     PRICE_ADJ_MAX_B=1.0,    # 価格帯モデルの傾きの上限（雑貨は新作が少なく傾きが不安定）
@@ -37,16 +39,20 @@ DEFAULT_PARAMS: dict = dict(
     AVAIL_MIN=0.50,         # 有効在庫率がこれ未満なら「欠品（供給制約）」
     COVER_REORDER=21,       # ピーク換算の在庫日数がこれ未満なら追加発注
     PEAK_MULT=None,         # ピーク月の日販点数 ÷ 期間平均の日販点数。None なら月次から自動計算
-    NEW_EXPOSURE=0.50,      # 新商品は発売日が不明なので、期間の半分だけ販売していたとみなす
+    NEW_EXPOSURE_MIN=0.30,  # 新商品は発売日が不明。連番が一番新しい品番は期間の30%だけ販売していたとみなす
     DI_CHECK=0.50,          # 欠品中で前年比がこれ未満なら「再生産・復刻（要確認）」
     PROVEN_CHECK=0.85,      # 欠品品は前年粗利がラインの85%以上で「需要実証済み」
     MAT_CHECK=50_000,       # ↑の最低粗利（パッチ等の少額品を確認対象から外す）
     CLEARANCE_PRICE=0.60,   # 今期の平均単価が前年のこの割合未満なら値下げ処分とみなす
+    DISCOUNT_GM_DROP=0.15,  # 今期の粗利率が前年よりこれ以上低い欠品品は「値引きで完売」と表示
+    MISSING_SHARE=0.20,     # 前年販売の20%以上を占めたSKUが今期ずっと欠品なら補充を促す
+    MISSING_MIN_UNITS=5,    # ↑の対象は前年に5点以上売れたSKUだけ
     # --- trend (同じ棚の在庫あり品と比べた相対トレンド) ----------------------------------
     TI_DOWN=0.60, TI_UP=1.20, TI_Z=1.28, TI_MIN_U25=30, TI_MIN_GROUP=8,
     GROW_FLOOR=0.70,        # 成長中の例外はラインの70%以上の品番だけ
     # --- price / cost update --------------------------------------------------------
     GM_LOW_Q=0.20,          # 粗利率が棚の下位20%なら価格・原価の見直し候補
+    GM_MIN_UNITS=10,        # ↑の基準は今期10点以上売れた品番から計算する
     PRICE_CAP=0.15,         # 想定する値上げ幅の上限
     MAT=50_000,             # 見直しで増える粗利の最低額
     # --- clearance ------------------------------------------------------------------
@@ -131,8 +137,23 @@ def check_reconciliation(prev_products: pd.DataFrame, cal: Calendar, tol: float 
 
 
 def check_current(curr_products: pd.DataFrame, monthly: pd.DataFrame, cal: Calendar, tol: float = 0.005) -> None:
-    """Warn when this year's product file and monthly file cover different periods."""
-    m = monthly[(monthly["month"].dt.year == cal.start.year) & (monthly["month"].dt.month <= cal.end.month)]
+    """Fail when the stated end date is not covered by the data; warn when the two files disagree."""
+    y = cal.start.year
+    m = monthly[(monthly["month"].dt.year == y) & (monthly["month"].dt.month <= cal.end.month)]
+    have = set(m["month"].dt.month)
+    missing = [k for k in range(1, cal.end.month + 1) if k not in have]
+    if missing:
+        raise ValueError(f"月別売上に{y}年{missing}月がありません。--curr-end（{cal.end.date()}）を確認してください。")
+    # The end month's sales should be roughly what end.day of that month sold last year (times this year's growth).
+    prev = monthly[monthly["month"].dt.year == y - 1].set_index(monthly[monthly["month"].dt.year == y - 1]["month"].dt.month)
+    cur = m.set_index(m["month"].dt.month)["純売上(税抜)"]
+    done = [k for k in range(1, cal.end.month) if k in prev.index]
+    growth = float(cur[done].sum() / prev.loc[done, "純売上(税抜)"].sum()) if done else 1.0
+    expected = prev.loc[cal.end.month, "純売上(税抜)"] * cal.end.day / cal.end.days_in_month * growth
+    ratio = float(cur[cal.end.month] / expected) if expected else 1.0
+    if not 0.35 <= ratio <= 2.5:
+        raise ValueError(f"{y}年{cal.end.month}月の売上が、{cal.end.day}日までの想定の{ratio:.0%}です。"
+                         f"--curr-end（{cal.end.date()}）がデータの最終日と合っているか確認してください。")
     total = float(m["純売上(税抜)"].sum())
     prod = float(curr_products["純売上(税抜)"].sum())
     if total and abs(prod - total) / total > tol:

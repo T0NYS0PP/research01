@@ -147,7 +147,7 @@ details summary { cursor: pointer; color: var(--accent); font-size: var(--step--
     <div class="findings" id="findings"></div>
     <div class="panel">
       <h3>判定ごとの今期売上シェア</h3>
-      <p class="small muted" style="margin-bottom:12px">今期の商品売上（税抜、他社ブランドを含む）に占める割合。右は品番数（うち今期販売あり）。</p>
+      <p class="small muted" style="margin-bottom:12px">自社商品の今期売上（税抜）に占める割合。他社ブランドだけは全商品売上に占める割合です。右は品番数（うち今期販売あり）。</p>
       <div class="bars" id="labelBars"></div>
     </div>
   </section>
@@ -156,9 +156,9 @@ details summary { cursor: pointer; color: var(--accent); font-size: var(--step--
     <h2 id="h-line">販売をやめる分岐点のしくみ</h2>
     <p class="lede">「この商品の棚と生産枠を、典型的な新商品に渡したら、もっと粗利を稼げるか」で判定します。今年発売した新商品が同じ期間に稼いだ粗利の中央値を、棚ごとの<b>分岐点ライン</b>とします。既存品の粗利がこのラインを下回ると、新商品に入れ替えたほうが半分以上の確率で得になります。</p>
     <div class="steps">
-      <div class="panel"><b>1. 同じ物差しにそろえる</b><p>今期（1/1〜<span data-k="endmd"></span>）の粗利で比べます。秋冬に売れるフーディ・ニット・長袖Tは季節補正をかけ、前年分は同じ期間の割合に換算します。</p></div>
+      <div class="panel"><b>1. 同じ物差しにそろえる</b><p>今期（1/1〜<span data-k="endmd"></span>）の粗利で比べます。<span id="seasonText"></span>前年分は同じ期間の割合に換算します。</p></div>
       <div class="panel"><b>2. 欠品を見抜く</b><p>売れ筋のサイズ・色が切れている品番は「売れなかった」のではなく「売る物がなかった」ので、前年の実績も使って判定します。</p></div>
-      <div class="panel"><b>3. 価格帯をそろえる</b><p>棚の平均より安い商品（ショーツや無地寄りのTシャツなど）は、同じ価格帯の新作が稼ぐ粗利と比べるため、ラインを下げて判定します。高い商品のラインは上げません。</p></div>
+      <div class="panel"><b>3. 価格帯をそろえる</b><p>棚の平均より安い商品（たとえばパンツの棚のショーツ）は、同じ価格帯の新作が稼ぐ粗利と比べるため、ラインを下げて判定します。高い商品のラインは上げません。</p></div>
       <div class="panel"><b>4. やめる前に救えるか確かめる</b><p>前年はラインを超えていたならデザイン刷新、+15%以内の値上げで届くなら価格・原価の見直し。どれでも届かないときだけ終売にします。</p></div>
     </div>
     <div class="formula">終売の条件 ＝ 今期の粗利 &lt; ライン　かつ　前年の粗利（同期間換算）&lt; ライン　かつ　刷新・値上げでも届かない　かつ　新商品・前年後半投入の冬物ではない</div>
@@ -254,6 +254,7 @@ document.querySelectorAll('[data-k="endmd"]').forEach(e => e.textContent = S.end
 document.querySelectorAll('[data-k="end"]').forEach(e => e.textContent = S.end);
 document.querySelectorAll('[data-k="nlaunch"]').forEach(e => e.textContent = S.n_launch_sample);
 document.querySelectorAll('[data-k="stabruns"]').forEach(e => e.textContent = S.stability_runs);
+document.getElementById("seasonText").textContent = S.season_adjusted ? "秋冬に売れるフーディ・ニット・長袖Tは季節補正をかけ、" : "判定期間に秋冬の売り時が含まれるので季節補正はかけず、";
 document.getElementById("metaRow").innerHTML =
   `<span>判定期間 ${esc(S.start)} 〜 ${esc(S.end)}（${S.window_days}日）</span><span>比較：${S.start.slice(0,4) - 1}年 通年</span>` +
   `<span>自社 ${S.n_styles} 品番（今期販売 ${S.n_active}）＋他社ブランド</span>`;
@@ -263,11 +264,16 @@ const F = [
   {k: `${S.stop_n}品番`, t: "やめる品番は多いが、売上への影響は小さい",
    p: `今期に売れた自社${S.n_active}品番のうち${S.stop_n}品番（${pct(S.stop_n / S.n_active, 0)}）が終売判定です。自社売上に占める割合は${pct(S.stop_share)}で、ラインを厳しくしても${pct(S.stop_share_max)}（${S.stop_n_max}品番）にとどまります。品番を絞っても売上はほとんど減らないので、空いた棚と生産枠を新作に回せます。`},
   {k: pct(S.remake_out_share), t: "売れ筋の欠品が一番の取りこぼし",
-   p: `分岐点ラインを超えて売れているのに、売れ筋のサイズ・色が切れている品番が${S.remake_out_n}品番、自社売上の${pct(S.remake_out_share)}あります。ほかに${S.remake_cover_n}品番（${pct(S.remake_cover_share)}）はピーク前の在庫が3週間分を切っています。前年に売れていたのに欠品で止まっている品番も${S.check_n}品番（前年粗利${man(S.check_g25)}）。在庫は${esc(S.end)}時点の値です。`},
+   p: `分岐点ラインを超えて売れているのに、売れ筋のサイズ・色が切れている品番が${S.remake_out_n}品番、自社売上の${pct(S.remake_out_share)}あります。ほかに${S.remake_cover_n}品番（${pct(S.remake_cover_share)}）はピーク前の在庫が${S.cover_days}日分を切っています。前年に売れていたのに欠品で止まっている品番も${S.check_n}品番（前年粗利${man(S.check_g25)}）。在庫は${esc(S.end)}時点の値です。`},
   {k: pct(S.new_share + S.young_share, 0), t: "売上の柱は直近1年余りの新作",
    p: `今年の新作${S.new_n}品番が自社売上の${pct(S.new_share)}、去年後半に出した${S.young_n}品番が${pct(S.young_share)}を稼いでいます。新作を出し続けることが売上の土台なので、終売で空いた枠は新作に回します。`},
-  {k: `${(S.own_ratio * 100 - 100).toFixed(1)}%`, t: "店の伸びは他社ブランド頼み",
-   p: `同じ期間で比べると、自社品の売上は前年比${(S.own_ratio * 100 - 100).toFixed(1)}%でほぼ横ばい、粗利率も${pct(S.own_gm25)}→${pct(S.own_gm26)}です。店全体の伸びは他社ブランド（前年同期の${S.other_ratio.toFixed(1)}倍）によるものです。`},
+  (() => {
+    const d = S.own_ratio - 1, flat = Math.abs(d) < 0.03, otherDriven = S.other_ratio > 1.1 && d < 0.03;
+    const word = flat ? "ほぼ横ばい" : d > 0 ? "増加" : "減少";
+    return {k: `${d >= 0 ? "+" : ""}${(d * 100).toFixed(1)}%`, t: otherDriven ? "店の伸びは他社ブランド頼み" : `自社品の売上は${word}`,
+      p: `同じ期間で比べると、自社品の売上は前年比${d >= 0 ? "+" : ""}${(d * 100).toFixed(1)}%で${word}、粗利率は${pct(S.own_gm25)}→${pct(S.own_gm26)}です。` +
+         (S.other_ratio ? `他社ブランドは前年同期の${S.other_ratio.toFixed(1)}倍です。` : "")};
+  })(),
 ];
 document.getElementById("findings").innerHTML = F.map(f =>
   `<div class="finding"><div class="k">${esc(f.k)}</div><div class="t">${esc(f.t)}</div><p>${f.p}</p></div>`).join("");
@@ -283,7 +289,7 @@ document.getElementById("linesTable").innerHTML =
   `<thead><tr><th>棚</th><th class="r">分岐点ライン</th><th class="r">年換算</th><th class="r">月あたり販売数</th><th class="r">即時値下げライン</th><th class="r">優先Aライン</th><th class="r">80%区間</th><th class="r">新商品数</th><th class="r">今期販売品番</th></tr></thead><tbody>` +
   DATA.lines.map(r => `<tr><td>${esc(r.grp)}</td><td class="r"><b>${man(r.H50)}</b></td><td class="r">${man(r.annual)}</td>` +
     `<td class="r">${r.per_month == null ? "–" : r.per_month.toFixed(1) + " 点"}</td><td class="r">${man(r.H25)}</td><td class="r">${man(r.H75)}</td>` +
-    `<td class="r">${r.n < 3 ? '<span class="muted">モデル推定</span>' : r.p10 == null ? "–" : man(r.p10) + "〜" + man(r.p90)}</td><td class="r">${r.n}</td><td class="r">${r.n_styles}</td></tr>`).join("") + "</tbody>";
+    `<td class="r">${r.basis !== "新商品" ? `<span class="muted">${esc(r.basis)}が基準</span>` : r.n < 3 ? '<span class="muted">モデル推定</span>' : r.p10 == null ? "–" : man(r.p10) + "〜" + man(r.p90)}</td><td class="r">${r.n}</td><td class="r">${r.n_styles}</td></tr>`).join("") + "</tbody>";
 
 // ---- style table with tabs, search, sort
 const LABELS = DATA.labels.map(l => l.label);
@@ -419,7 +425,7 @@ document.getElementById("sensTable").innerHTML =
   const sy = sum(C, "sales") / sum(Pp, "sales") - 1, ty = sum(C, "tx") / sum(Pp, "tx") - 1;
   document.getElementById("trendLede").textContent =
     `1〜${endM - 1}月の純売上は前年比${sy >= 0 ? "+" : ""}${(sy * 100).toFixed(1)}%、取引数は${ty >= 0 ? "+" : ""}${(ty * 100).toFixed(1)}%。` +
-    (ty <= 0.01 && sy > ty ? "取引数は伸びておらず、売上の伸びは客単価の上昇によるものです。" : "") +
+    (sy > 0 && ty <= 0.01 ? "取引数は伸びておらず、売上の伸びは客単価の上昇によるものです。" : "") +
     (rows.length >= 2 && rows.slice(-2).every(r => r.c.tx < r.p.tx) ? `直近の${rows[rows.length - 2].m}〜${rows[rows.length - 1].m}月は取引数が前年を下回っています。` : "");
 })();
 </script>

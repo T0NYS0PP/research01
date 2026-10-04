@@ -16,11 +16,11 @@ from . import taxonomy as tx
 from .model import LABEL_ORDER, STOP_LABELS
 
 LABEL_HELP = {
-    "再生産": "分岐点ラインを超えて売れているのに、欠品している（即手配）か、ピーク前の在庫が3週間分を切っている（追加発注）。在庫は書き出し時点の値。",
+    "再生産": "分岐点ラインを超えて売れているのに、欠品している（即手配）か、ピーク前の在庫が{cover}日分を切っている（追加発注）。在庫は書き出し時点の値。",
     "再生産・復刻（要確認）": "前年は売れていたが欠品で今期の数字が伸びていない。欠品した日を確認して、同型で再生産か刷新版かを決める。",
     "継続・強化": "ラインを超えて在庫も足りている。枠を維持して欠品させない。",
     "アップデート": "需要の土台はあるが勢いが落ちている、または粗利率が低い。デザイン刷新か価格・原価の見直し。",
-    "様子見": "新商品・前年後半投入・成長中などで、まだ判定できない。冬明けまたは通年で再判定する。",
+    "様子見": "新商品・前年後半投入・成長中などで、まだ判定できない。次回の判定（冬物は冬のピーク後）で再評価する。",
     "終売（在庫消化）": "2年続けてラインを下回り、刷新や値上げでも届かない。在庫を売り切ったら作らない。",
     "終売済み": "在庫0でラインも下回る。再生産しない（多くはすでに自然終売）。",
     "他社ブランド別管理": "原価が登録されていないので粗利で比べられない。掛率を登録してから同じ物差しで評価する。",
@@ -67,11 +67,12 @@ def build_report(out_dir: str | Path, monthly: pd.DataFrame) -> Path:
     sens = meta.get("sensitivity", {})
     base = sens.get("基準", {})
     line_variants = [v for k, v in sens.items() if k.startswith(("基準", "ライン"))]
+    strict = max(line_variants, key=lambda v: v["stop_share"], default={})
     young = own[(own.age == "young") & (own.u26 > 0)]
     summary = dict(
         own_total=float(own.s26.sum()), stop_n=base.get("stop_n"), stop_share=base.get("stop_share"),
-        stop_share_max=max((v["stop_share"] for v in line_variants), default=None),
-        stop_n_max=max((v["stop_n"] for v in line_variants), default=None),
+        stop_share_max=strict.get("stop_share"), stop_n_max=strict.get("stop_n"),
+        cover_days=meta["params"]["COVER_REORDER"], season_adjusted=meta["params"]["SEASON_HEAVY"] > 1,
         remake_out_n=base.get("remake_out_n"), remake_out_share=base.get("remake_out_share"),
         remake_cover_n=(base.get("remake_n", 0) - base.get("remake_out_n", 0)),
         remake_cover_share=(base.get("remake_share", 0) - base.get("remake_out_share", 0)),
@@ -93,16 +94,20 @@ def build_report(out_dir: str | Path, monthly: pd.DataFrame) -> Path:
     )
 
     labels = []
+    own_total = float(own.s26.sum())
     for lab in LABEL_ORDER:
         d = st[st.label == lab]
+        # Own-product labels are shares of own sales; the other-brand row is its share of all sales.
+        denom = total26 if lab == "他社ブランド別管理" else own_total
         labels.append(dict(label=lab, n=int(len(d)), n_active=int((d.u26 > 0).sum()), s26=float(d.s26.sum()),
-                           share=float(d.s26.sum() / total26), stock=float(d.stock.sum()), help=LABEL_HELP[lab]))
+                           share=float(d.s26.sum() / denom), stock=float(d.stock.sum()),
+                           help=LABEL_HELP[lab].format(cover=meta["params"]["COVER_REORDER"])))
 
     gpu = active.groupby("grp")["gpu"].median()
     lines = []
     for g, r in H.iterrows():
         annual = r.H50 / meta["w_gp"]
-        lines.append(dict(grp=g, n=int(r.n_launch), H25=r.H25, H50=r.H50, H75=r.H75, annual=annual,
+        lines.append(dict(grp=g, n=int(r.n_launch), basis=r.get("basis", "新商品"), H25=r.H25, H50=r.H50, H75=r.H75, annual=annual,
                           per_month=annual / gpu.get(g, np.nan) / 12 if g in gpu else None,
                           p10=r.get("H50_p10"), p90=r.get("H50_p90"),
                           n_styles=int((active.grp == g).sum())))
