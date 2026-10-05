@@ -22,6 +22,13 @@ python3 run_analysis.py \
 - `--stability-runs`：安定度の再判定回数（既定200回、数分かかります。0で省略）
 - `--report-only`：既存の出力からレポートだけ作り直す
 
+集客データ（任意）：`--tracker tracker.csv --activity activity.csv` を付けると、認知KPI週次トラッカーの数値と店舗の売上を並べた「集客データとの照合」がレポートに加わります。どちらも日曜はじまりの週を1行とするCSVです。
+
+- `tracker.csv`：`week, gsc_impr, gsc_clicks, gsc_ctr, gsc_pos, ig_reach, ig_impr, sessions, followers, ig_sessions`
+- `activity.csv`：`week, ig_posts, newsletters, social_sessions, email_sessions, sessions, checkouts, conv_rate, sales_incl_store, from, to`（`from`/`to` は一部の日だけ計測した週の計測日。ふだんは空欄）
+
+判定終了日（`--curr-end`）までに終わっていない週は自動で除外されます。
+
 出力：`report.html`（レポート）、`style_decisions.csv`（全品番の判定・理由・指標、Excelで開けます）、`dead_skus.csv`、`series.csv`、`other_brands.csv`、`break_point_lines.csv`、`run_meta.json`。
 
 ## 判定のしくみ
