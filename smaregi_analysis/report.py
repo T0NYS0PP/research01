@@ -137,8 +137,10 @@ def build_report(out_dir: str | Path, monthly: pd.DataFrame) -> Path:
                          ["style", "name", "color", "size", "今期販売点数", "在庫", "在庫日数", "label"])
 
     sens_rows = [dict(name=k, **v) for k, v in sens.items()]
+    mk_path = out / "marketing.json"
+    marketing = json.loads(mk_path.read_text()) if mk_path.exists() else None
     data = dict(summary=summary, labels=labels, lines=lines, styles=styles, monthly=monthly_rows,
-                series=series_rows, brands=brand_rows, dead=dead_rows, params=meta["params"], sensitivity=sens_rows)
+                series=series_rows, brands=brand_rows, dead=dead_rows, params=meta["params"], sensitivity=sens_rows, marketing=marketing)
     template = Path(__file__).with_name("report_template.html").read_text(encoding="utf-8")
     page = template.replace("/*__DATA__*/null", json.dumps(data, ensure_ascii=False, default=_f).replace("</", "<\\/"))
     path = out / "report.html"

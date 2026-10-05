@@ -121,6 +121,16 @@ input[type="search"] { font: inherit; font-size: var(--step--1); padding: 6px 10
 ul.notes { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 80ch; color: var(--ink-2); }
 details summary { cursor: pointer; color: var(--accent); font-size: var(--step--1); }
 .up { color: var(--good-ink); } .down { color: var(--bad-ink); }
+.minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px 22px; }
+.mini { min-width: 0; display: grid; gap: 4px; }
+.mini .h { font-size: var(--step--1); font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+.mini .h span { font-weight: 400; color: var(--muted); }
+.mini svg { display: block; width: 100%; height: auto; }
+.mini .axis text { fill: var(--muted); font-size: 10px; font-family: var(--font-body); }
+.mini .grid line { stroke: var(--line); stroke-width: 1; }
+.mini .bar { fill: var(--s2026); }
+.mini .bar.hl { fill: var(--l-check); }
+.mini .bar:hover, .mini .bar:focus { fill: var(--ink); }
 @media (max-width: 640px) {
   .bars .row { grid-template-columns: 1fr; gap: 4px; }
   .bars .val { text-align: left; }
@@ -131,7 +141,7 @@ details summary { cursor: pointer; color: var(--accent); font-size: var(--step--
 
 <nav class="toc" aria-label="目次">
   <a href="#summary">結論</a><a href="#line">分岐点のしくみ</a><a href="#actions">品番別の判定</a>
-  <a href="#series">シリーズ</a><a href="#trend">店全体の推移</a><a href="#brands">他社ブランド</a>
+  <a href="#series">シリーズ</a><a href="#trend">店全体の推移</a><a href="#marketing" id="navMarketing">集客データ</a><a href="#brands">他社ブランド</a>
   <a href="#sku">死に筋SKU</a><a href="#notes">注意点</a>
 </nav>
 
@@ -196,6 +206,25 @@ details summary { cursor: pointer; color: var(--accent); font-size: var(--step--
       <div class="chart" id="trendChart"></div>
     </div>
     <div class="panel scroll"><table id="yoyTable"></table></div>
+  </section>
+
+  <section id="marketing" aria-labelledby="h-marketing" hidden>
+    <h2 id="h-marketing">集客データとの照合</h2>
+    <p class="lede" id="mkLede"></p>
+    <div class="findings" id="mkFindings"></div>
+    <div class="panel">
+      <div class="minis" id="mkCharts"></div>
+      <p class="small muted" style="margin-top:10px">週は日曜はじまり。黄色の棒はリーチの山（中央値の2倍以上）のうち、サイト訪問につながらなかった週です。グラフにふれると数値が出ます。</p>
+    </div>
+    <div class="panel scroll">
+      <h3 style="margin-bottom:8px">リーチの山とサイト訪問</h3>
+      <table id="mkSpikes"></table>
+    </div>
+    <div class="panel">
+      <h3 style="margin-bottom:8px">商品判定への反映</h3>
+      <ul class="notes" id="mkImplications"></ul>
+    </div>
+    <ul class="notes small" id="mkNotes"></ul>
   </section>
 
   <section id="brands" aria-labelledby="h-brands">
@@ -275,6 +304,12 @@ const F = [
          (S.other_ratio ? `他社ブランドは前年同期の${S.other_ratio.toFixed(1)}倍です。` : "")};
   })(),
 ];
+if (DATA.marketing && DATA.marketing.ig.flat_rate != null) {
+  const g = DATA.marketing.ig, rec = DATA.marketing.store_recent, last = rec[rec.length - 1];
+  const firstFlat = +g.spikes.find(x => !x.converting).week.slice(5, 7);
+  F.push({k: pct(g.flat_rate, 1), t: "最近のSNSリーチは店にもネットにも届いていない",
+    p: `${firstFlat}月以降のInstagramのリーチの山は、サイト訪問がリーチの${pct(g.flat_rate, 1)}にとどまりました（${g.conv_months.join("・")}の山は${pct(g.conv_rate, 1)}）。店舗の客数は${+last.month.slice(5)}月に前年比${(last.tx_yoy * 100).toFixed(1)}%で、集客KPIとの連動も見られません。詳しくは「集客データとの照合」へ。`});
+}
 document.getElementById("findings").innerHTML = F.map(f =>
   `<div class="finding"><div class="k">${esc(f.k)}</div><div class="t">${esc(f.t)}</div><p>${f.p}</p></div>`).join("");
 
@@ -364,6 +399,112 @@ document.getElementById("deadTable").innerHTML = DATA.dead.length ?
   DATA.dead.map(r => `<tr><td>${esc(r.style)}</td><td>${esc(r.name)}</td><td>${esc(r.color)}</td><td>${esc(r.size)}</td><td class="r">${int(r["今期販売点数"])}</td>` +
     `<td class="r">${int(r["在庫"])}</td><td class="r">${r["在庫日数"] == null ? "販売なし" : int(r["在庫日数"]) + "日"}</td><td>${r.label ? chip(r.label) : ""}</td></tr>`).join("") + "</tbody>"
   : "<tbody><tr><td class='muted'>該当なし</td></tr></tbody>";
+
+// ---- marketing
+(function () {
+  const M = DATA.marketing;
+  if (!M) { const n = document.getElementById("navMarketing"); if (n) n.remove(); return; }
+  document.getElementById("marketing").hidden = false;
+  const W = M.weekly, sign = v => (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+  const md = s => `${+s.slice(5, 7)}/${+s.slice(8, 10)}`;
+  document.getElementById("mkLede").textContent =
+    `指名検索・Instagram・ネットストアの週次データ（${md(M.first_week)}週〜${md(M.last_week)}週、認知KPI週次トラッカー）を、店舗の売上と並べて見ました。`;
+  // order peaks: consecutive weeks with ≥3× the median orders
+  const med = M.orders ? M.orders.median : null, peaks = [];
+  if (med) { let cur = null;
+    W.forEach(r => { const hit = r.checkouts != null && r.checkouts >= 3 * med;
+      if (hit) { if (!cur) { cur = {from: r.week, to: r.week, n: 0, weeks: 0}; peaks.push(cur); } cur.to = r.week; cur.n += r.checkouts; cur.weeks++; }
+      else if (r.checkouts != null && r.checkouts < 1.5 * med) cur = null; }); }
+  const sc = M.store_corr, ig = M.ig, rec = M.store_recent, srch = M.search;
+  const ranges = list => { const out = []; let cur = null;
+    list.forEach(wk => { const d = new Date(wk);
+      if (cur && (d - cur.end) / 864e5 <= 7) cur.end = d; else { cur = {start: d, end: d}; out.push(cur); } });
+    return out.map(r => { const f = x => `${x.getMonth() + 1}/${x.getDate()}`;
+      return +r.start === +r.end ? `${f(r.start)}週` : `${f(r.start)}〜${f(r.end)}週`; }).join("・"); };
+  const convR = ranges(ig.spikes.filter(x => x.converting).map(x => x.week));
+  const flatR = ranges(ig.spikes.filter(x => !x.converting).map(x => x.week));
+  const q1 = srch.find(x => x.q === 1), q3 = srch.find(x => x.q === 3);
+  const neg = ["sessions", "ig_reach"].every(k => sc[k].rho != null && sc[k].rho < 0);
+  const cards = [
+    {k: neg ? "逆向き" : "弱い", t: "店舗の売上は集客KPIと連動していない",
+     p: `${M.corr_months.length}か月の月次で比べると（月数が少ないので目安）、店舗の取引数と総セッションの相関はρ=${sc.sessions.rho.toFixed(2)}、IGリーチとはρ=${sc.ig_reach.rho.toFixed(2)}${neg ? "で、むしろ逆向き" : ""}です。店舗は観光客の季節の波で動き、SNSの施策は閑散期に打たれています。集客KPIはネットストアとブランド力の指標として見るのが妥当です。`},
+    ig.flat_rate != null && ig.conv_rate != null ? {k: pct(ig.flat_rate, 1), t: "最近のリーチの山はサイト訪問につながっていない",
+     p: `リーチの山のうち、${convR}はリーチの${pct(ig.conv_rate, 1)}がサイト訪問になりました。${flatR}は${pct(ig.flat_rate, 1)}で、約${Math.round(ig.conv_rate / ig.flat_rate)}分の1です。リーチの数だけを追うと、訪問・注文・フォロワーにつながらない投稿が増えます。8月のようにリーチが小さくても、リンク付きの告知はリーチの7%前後が訪問しています。`} : null,
+    M.orders ? {k: `ρ=${M.orders.vs_email.rho.toFixed(2)}`, t: "ネット注文はメールで動き、リーチでは動かない",
+     p: `週ごとのネット注文（完了チェックアウト）はメール経由の訪問と連動し（ρ=${M.orders.vs_email.rho.toFixed(2)}）、IGリーチ（ρ=${M.orders.vs_reach.rho.toFixed(2)}）やSNS経由の訪問（ρ=${M.orders.vs_social.rho.toFixed(2)}）とはほぼ無関係です。平常は週${Math.round(med)}件前後で、山は${peaks.map(p => `${md(p.from)}週から${p.weeks}週間で${p.n}件`).join("、")}でした。`} : null,
+    rec.length ? {k: sign(rec[rec.length - 1].tx_yoy), t: "店舗の客数が落ちている",
+     p: `店舗の取引数は前年比で${rec.map(r => `${+r.month.slice(5)}月${sign(r.tx_yoy)}`).join("、")}。客単価は上がっていますが、同じ品番の価格は前年比${sign(M.like_for_like_price - 1)}でほぼ据え置きなので、他社ブランドや高単価品の比率が上がった結果です。` +
+       (q1 && q3 ? `指名検索の表示回数も1〜3月の週${Math.round(q1.impr).toLocaleString()}回から7〜9月の週${Math.round(q3.impr).toLocaleString()}回（${sign(q3.impr / q1.impr - 1)}）に減り、平均掲載順位は${q1.pos.toFixed(1)}位から${q3.pos.toFixed(1)}位に下がりました。` : "")} : null,
+  ].filter(Boolean);
+  document.getElementById("mkFindings").innerHTML = cards.map(f =>
+    `<div class="finding"><div class="k">${esc(f.k)}</div><div class="t">${esc(f.t)}</div><p>${esc(f.p)}</p></div>`).join("");
+
+  // small multiples
+  const flatWeeks = new Set(ig.spikes.filter(x => !x.converting).map(x => x.week));
+  const panels = [
+    {k: "gsc_impr", h: "指名検索 表示回数", f: v => Math.round(v).toLocaleString()},
+    {k: "gsc_pos", h: "指名検索 平均掲載順位", note: "小さいほど上位", f: v => v.toFixed(1) + "位"},
+    {k: "ig_reach", h: "IGリーチ", f: v => Math.round(v).toLocaleString(), hl: true},
+    {k: "ig_sessions", h: "IG経由のサイト訪問", f: v => Math.round(v).toLocaleString(), hl: true},
+    {k: "checkouts", h: "ネット注文（完了チェックアウト）", f: v => Math.round(v).toLocaleString() + "件"},
+    {k: "email_sessions", h: "メール経由のサイト訪問", f: v => Math.round(v).toLocaleString()},
+  ].filter(p => W.some(r => r[p.k] != null));
+  const box = document.getElementById("mkCharts");
+  box.innerHTML = panels.map((p, i) => `<div class="mini"><div class="h">${esc(p.h)}${p.note ? `<span>${esc(p.note)}</span>` : ""}</div><div class="chart" id="mini${i}"></div></div>`).join("");
+  panels.forEach((p, i) => {
+    const vals = W.map(r => r[p.k]), n = vals.length, Wd = 320, H = 130, P = {l: 38, r: 6, t: 8, b: 20};
+    const max = Math.max(...vals.filter(v => v != null)) * 1.05, bw = (Wd - P.l - P.r) / n;
+    const y = v => P.t + (1 - v / max) * (H - P.t - P.b);
+    const ticks = [0, max / 2, max].map(v => p.k === "gsc_pos" ? +v.toFixed(0) : Math.round(v / (max > 2000 ? 1000 : 1)) * (max > 2000 ? 1000 : 1));
+    let svg = `<svg viewBox="0 0 ${Wd} ${H}" role="img" aria-label="${esc(p.h)}の週次推移"><g class="grid">${ticks.map(t => `<line x1="${P.l}" x2="${Wd - P.r}" y1="${y(t)}" y2="${y(t)}"/>`).join("")}</g>`;
+    svg += `<g class="axis">${ticks.map(t => `<text x="${P.l - 4}" y="${y(t) + 3}" text-anchor="end">${t >= 10000 ? (t / 10000).toFixed(1) + "万" : t.toLocaleString()}</text>`).join("")}`;
+    let lastM = null, lastJ = -9;
+    W.forEach((r, j) => { const m = +r.week.slice(5, 7);
+      if (m !== lastM && +r.week.slice(8, 10) <= 7 && j - lastJ >= 3) { svg += `<text x="${P.l + j * bw + bw / 2}" y="${H - 6}" text-anchor="middle">${m}月</text>`; lastJ = j; }
+      lastM = m; });
+    svg += `</g>`;
+    if (p.k === "gsc_pos") {
+      const pts = vals.map((v, j) => v == null ? null : `${(P.l + j * bw + bw / 2).toFixed(1)},${y(v).toFixed(1)}`).filter(Boolean);
+      svg += `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--s2026)" stroke-width="2" stroke-linejoin="round"/>`;
+      vals.forEach((v, j) => { if (v != null) svg += `<rect class="hit" x="${P.l + j * bw}" y="${P.t}" width="${bw}" height="${H - P.t - P.b}" fill="transparent" data-j="${j}"/>`; });
+    } else {
+      vals.forEach((v, j) => { if (v == null) return;
+        const cls = p.hl && flatWeeks.has(W[j].week) ? "bar hl" : "bar";
+        svg += `<rect class="${cls}" x="${(P.l + j * bw + 0.5).toFixed(1)}" y="${y(v).toFixed(1)}" width="${Math.max(bw - 1.5, 1).toFixed(1)}" height="${(H - P.b - y(v)).toFixed(1)}" rx="1.5" data-j="${j}"/>`; });
+    }
+    svg += `</svg>`;
+    const el = document.getElementById("mini" + i); el.innerHTML = svg + `<div class="tip" hidden></div>`;
+    const tip = el.querySelector(".tip"), sv = el.querySelector("svg");
+    sv.addEventListener("pointermove", e => { const t = e.target.closest("[data-j]"); if (!t) { tip.hidden = true; return; }
+      const j = +t.dataset.j; tip.innerHTML = `<b>${md(W[j].week)}週</b><div class="row"><span>${esc(p.h)}</span><span>${p.f(vals[j])}</span></div>`;
+      tip.hidden = false; const r = sv.getBoundingClientRect(), x = e.clientX - r.left;
+      tip.style.left = Math.min(Math.max(x + 10, 0), el.clientWidth - tip.offsetWidth - 4) + "px"; tip.style.top = "0px"; });
+    sv.addEventListener("pointerleave", () => { tip.hidden = true; });
+  });
+
+  // spike table
+  document.getElementById("mkSpikes").innerHTML =
+    `<thead><tr><th>週</th><th class="r">IGリーチ</th><th class="r">IG経由の訪問</th><th class="r">訪問率</th><th class="r">ネット注文</th><th>判定</th></tr></thead><tbody>` +
+    ig.spikes.map(x => `<tr><td>${md(x.week)}週</td><td class="r">${x.reach.toLocaleString()}</td><td class="r">${x.ig_sessions.toLocaleString()}</td>` +
+      `<td class="r">${pct(x.rate, 1)}</td><td class="r">${x.checkouts == null ? "未入力" : x.checkouts + "件"}</td><td>${x.converting ? "訪問につながった" : '<span class="down">訪問につながらず</span>'}</td></tr>`).join("") +
+    `<tr><td class="muted">山以外の週の平均</td><td></td><td></td><td class="r">${pct(ig.rest_rate, 1)}</td><td></td><td></td></tr></tbody>`;
+
+  const on = M.online.filter(o => o.share >= 0.05), fo = M.follow;
+  const imp = [
+    on.length ? `スマレジの売上にはネットストアの売上が入っていません。ネット分は${on.map(o => `${+o.month.slice(5)}月に約${pct(o.share, 0)}`).join("、")}（推定）で、ほかの月は誤差の範囲です。キャンペーンで売れた品番は、この判定では控えめに出ている可能性があります。Shopifyの商品別売上を書き出してもらえれば合算します。` : null,
+    "欠品中の「再生産」「要確認」の品番は、再入荷をメールで告知すると注文につながりやすいです。売り切れの品番をSNSで見せても売上にならないので、露出は在庫がある品番に絞ります。",
+    "新作の告知は、8月のようなリンク付きの投稿・ストーリーズとメールの組み合わせで行います。リーチの数を伸ばす投稿は、訪問にもフォロワーにもつながっていません。",
+    rec.length ? `店舗の客数は直近で前年比${sign(rec[rec.length - 1].tx_yoy)}です。品番の判定は同じ期間の新作と比べる相対評価なので影響を受けにくいですが、再生産の数量は前年並みにせず、直近の売れ方で決めてください。` : null,
+    "トラッカーの「主な施策・投稿・コラボ・PR」欄に品番名を書いてもらえれば、品番ごとに「告知あり・なし」で初速を比べられるようになります。",
+  ].filter(Boolean);
+  document.getElementById("mkImplications").innerHTML = imp.map(x => `<li>${esc(x)}</li>`).join("");
+  const notes = [
+    `フォロワーは直近13週で週+${fo.pace.toFixed(0)}人のペースです。このままだと年末は約${Math.round(fo.projected).toLocaleString()}人で、2万人に届くには週+${Math.round(fo.needed)}人が必要です。`,
+    M.incomplete_weeks.length ? `${M.incomplete_weeks.map(md).join("・")}週は判定日（${md(S.end)}）時点でまだ終わっていないのに1週間分の値が入っていたため、分析から外しました。入力の行ずれがないか確認してください。` : null,
+    "指名検索は前年の数値がないため、表示回数の減少が季節によるものかはまだ分かりません。Search Consoleには16か月分残っているので、2025年分を書き出してもらえれば前年比で確かめられます。",
+  ].filter(Boolean);
+  document.getElementById("mkNotes").innerHTML = notes.map(x => `<li>${esc(x)}</li>`).join("");
+})();
 
 // ---- sensitivity
 document.getElementById("sensTable").innerHTML =
