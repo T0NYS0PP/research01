@@ -56,6 +56,10 @@ header.top { display: grid; gap: 10px; }
 .findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
 .finding { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
 .finding .k { font-size: var(--step-2); font-weight: 700; font-variant-numeric: tabular-nums; }
+.finding.wide { grid-column: 1 / -1; grid-template-columns: minmax(120px, 160px) 1fr; column-gap: 20px; align-items: start; }
+.finding.wide .k { grid-row: span 2; }
+.finding.wide p { max-width: 90ch; }
+@media (max-width: 640px) { .finding.wide { grid-template-columns: 1fr; } .finding.wide .k { grid-row: auto; } }
 .finding .t { font-weight: 700; }
 .finding p { color: var(--ink-2); font-size: var(--step--1); }
 
@@ -214,7 +218,7 @@ details summary { cursor: pointer; color: var(--accent); font-size: var(--step--
     <div class="findings" id="mkFindings"></div>
     <div class="panel">
       <div class="minis" id="mkCharts"></div>
-      <p class="small muted" style="margin-top:10px">週は日曜はじまり。黄色の棒はリーチの山（中央値の2倍以上）のうち、サイト訪問につながらなかった週です。グラフにふれると数値が出ます。</p>
+      <p class="small muted" style="margin-top:10px">週は日曜はじまり。黄色の棒は、リーチが平常の2倍以上だった週のうち、訪問÷リーチが平常週を下回った週です。グラフにふれると数値が出ます。</p>
     </div>
     <div class="panel scroll">
       <h3 style="margin-bottom:8px">リーチの山とサイト訪問</h3>
@@ -305,13 +309,13 @@ const F = [
   })(),
 ];
 if (DATA.marketing && DATA.marketing.ig.flat_rate != null) {
-  const g = DATA.marketing.ig, rec = DATA.marketing.store_recent, last = rec[rec.length - 1];
+  const g = DATA.marketing.ig, Mk = DATA.marketing;
   const firstFlat = +g.spikes.find(x => !x.converting).week.slice(5, 7);
-  F.push({k: pct(g.flat_rate, 1), t: "最近のSNSリーチは店にもネットにも届いていない",
-    p: `${firstFlat}月以降のInstagramのリーチの山は、サイト訪問がリーチの${pct(g.flat_rate, 1)}にとどまりました（${g.conv_months.join("・")}の山は${pct(g.conv_rate, 1)}）。店舗の客数は${+last.month.slice(5)}月に前年比${(last.tx_yoy * 100).toFixed(1)}%で、集客KPIとの連動も見られません。詳しくは「集客データとの照合」へ。`});
+  F.push({wide: true, k: `約${Math.round((Mk.dutyfree_min + Mk.dutyfree_max) / 2 * 10)}割`, t: "店舗は訪日客が中心。SNSの効果はネット側でしか測れない",
+    p: `店舗の売上の${pct(Mk.dutyfree_min, 0)}〜${pct(Mk.dutyfree_max, 0)}は免税（訪日客）で、集客KPIとの連動は見えません。${firstFlat}月以降のInstagramのリーチの山は、サイト訪問がリーチの${pct(g.flat_rate, 1)}と、リーチの割に訪問が少ない状態です（${g.conv_months.join("・")}の山は${pct(g.conv_rate, 1)}）。詳しくは「集客データとの照合」へ。`});
 }
 document.getElementById("findings").innerHTML = F.map(f =>
-  `<div class="finding"><div class="k">${esc(f.k)}</div><div class="t">${esc(f.t)}</div><p>${f.p}</p></div>`).join("");
+  `<div class="finding${f.wide ? " wide" : ""}"><div class="k">${esc(f.k)}</div><div class="t">${esc(f.t)}</div><p>${f.p}</p></div>`).join("");
 
 // ---- label bars
 const maxShare = Math.max(...DATA.labels.map(l => l.share));
@@ -417,24 +421,22 @@ document.getElementById("deadTable").innerHTML = DATA.dead.length ?
       else if (r.checkouts != null && r.checkouts < 1.5 * med) cur = null; }); }
   const sc = M.store_corr, ig = M.ig, rec = M.store_recent, srch = M.search;
   const ranges = list => { const out = []; let cur = null;
-    list.forEach(wk => { const d = new Date(wk);
-      if (cur && (d - cur.end) / 864e5 <= 7) cur.end = d; else { cur = {start: d, end: d}; out.push(cur); } });
-    return out.map(r => { const f = x => `${x.getMonth() + 1}/${x.getDate()}`;
-      return +r.start === +r.end ? `${f(r.start)}週` : `${f(r.start)}〜${f(r.end)}週`; }).join("・"); };
+    list.forEach(wk => { const d = Date.UTC(+wk.slice(0, 4), +wk.slice(5, 7) - 1, +wk.slice(8, 10));
+      if (cur && (d - cur.end) / 864e5 <= 7) { cur.end = d; cur.endS = wk; } else { cur = {start: d, end: d, startS: wk, endS: wk}; out.push(cur); } });
+    return out.map(r => r.startS === r.endS ? `${md(r.startS)}週` : `${md(r.startS)}〜${md(r.endS)}週`).join("・"); };
   const convR = ranges(ig.spikes.filter(x => x.converting).map(x => x.week));
-  const flatR = ranges(ig.spikes.filter(x => !x.converting).map(x => x.week));
-  const q1 = srch.find(x => x.q === 1), q3 = srch.find(x => x.q === 3);
-  const neg = ["sessions", "ig_reach"].every(k => sc[k].rho != null && sc[k].rho < 0);
+  const flat = ig.spikes.filter(x => !x.converting), flatR = ranges(flat.map(x => x.week));
+  const bestFlat = flat.slice().sort((a, b) => b.ig_sessions - a.ig_sessions)[0];
+  const O = M.orders, sr = M.season_rho;
   const cards = [
-    {k: neg ? "逆向き" : "弱い", t: "店舗の売上は集客KPIと連動していない",
-     p: `${M.corr_months.length}か月の月次で比べると（月数が少ないので目安）、店舗の取引数と総セッションの相関はρ=${sc.sessions.rho.toFixed(2)}、IGリーチとはρ=${sc.ig_reach.rho.toFixed(2)}${neg ? "で、むしろ逆向き" : ""}です。店舗は観光客の季節の波で動き、SNSの施策は閑散期に打たれています。集客KPIはネットストアとブランド力の指標として見るのが妥当です。`},
-    ig.flat_rate != null && ig.conv_rate != null ? {k: pct(ig.flat_rate, 1), t: "最近のリーチの山はサイト訪問につながっていない",
-     p: `リーチの山のうち、${convR}はリーチの${pct(ig.conv_rate, 1)}がサイト訪問になりました。${flatR}は${pct(ig.flat_rate, 1)}で、約${Math.round(ig.conv_rate / ig.flat_rate)}分の1です。リーチの数だけを追うと、訪問・注文・フォロワーにつながらない投稿が増えます。8月のようにリーチが小さくても、リンク付きの告知はリーチの7%前後が訪問しています。`} : null,
-    M.orders ? {k: `ρ=${M.orders.vs_email.rho.toFixed(2)}`, t: "ネット注文はメールで動き、リーチでは動かない",
-     p: `週ごとのネット注文（完了チェックアウト）はメール経由の訪問と連動し（ρ=${M.orders.vs_email.rho.toFixed(2)}）、IGリーチ（ρ=${M.orders.vs_reach.rho.toFixed(2)}）やSNS経由の訪問（ρ=${M.orders.vs_social.rho.toFixed(2)}）とはほぼ無関係です。平常は週${Math.round(med)}件前後で、山は${peaks.map(p => `${md(p.from)}週から${p.weeks}週間で${p.n}件`).join("、")}でした。`} : null,
-    rec.length ? {k: sign(rec[rec.length - 1].tx_yoy), t: "店舗の客数が落ちている",
-     p: `店舗の取引数は前年比で${rec.map(r => `${+r.month.slice(5)}月${sign(r.tx_yoy)}`).join("、")}。客単価は上がっていますが、同じ品番の価格は前年比${sign(M.like_for_like_price - 1)}でほぼ据え置きなので、他社ブランドや高単価品の比率が上がった結果です。` +
-       (q1 && q3 ? `指名検索の表示回数も1〜3月の週${Math.round(q1.impr).toLocaleString()}回から7〜9月の週${Math.round(q3.impr).toLocaleString()}回（${sign(q3.impr / q1.impr - 1)}）に減り、平均掲載順位は${q1.pos.toFixed(1)}位から${q3.pos.toFixed(1)}位に下がりました。` : "")} : null,
+    {k: `約${Math.round((M.dutyfree_min + M.dutyfree_max) / 2 * 10)}割`, t: "店舗は訪日客が中心で、集客KPIでは動きが見えない",
+     p: `店舗の売上の${pct(M.dutyfree_min, 0)}〜${pct(M.dutyfree_max, 0)}は免税（訪日客）で、月ごとの取引数は前年とほぼ同じ形で動いています（ρ=${sr.rho.toFixed(2)}）。${M.corr_months.length}か月の月次で比べた店舗の取引数との相関は、総セッションρ=${sc.sessions.rho.toFixed(2)}、IGリーチρ=${sc.ig_reach.rho.toFixed(2)}で、どちらもゼロと区別できません。SNSやメールの効果は季節の波に埋もれて、このデータでは店舗について測れません。集客KPIはネットストアとブランド力の指標として見るのが妥当です。`},
+    ig.flat_rate != null && ig.conv_rate != null ? {k: pct(ig.flat_rate, 1), t: "最近のリーチの山は、リーチの割に訪問が少ない",
+     p: `リーチが平常の2倍以上だった週のうち、${convR}はリーチの${pct(ig.conv_rate, 1)}に当たるサイト訪問がありました。${flatR}は${pct(ig.flat_rate, 1)}で、平常週の${pct(ig.rest_rate, 1)}も下回ります。ただし${md(bestFlat.week)}週は訪問${bestFlat.ig_sessions}・フォロワー+${bestFlat.net_follow}と伸びています。どの投稿が効いたかは、施策ログが空欄のため分かりません。`} : null,
+    O ? {k: pct(O.peak_share, 0), t: "ネット注文の山はキャンペーン週に集中している",
+     p: `ネット注文（完了チェックアウト）の${pct(O.peak_share, 0)}が、平常の3倍以上売れた${O.peak_weeks}週に集中しています（${peaks.map(p => `${md(p.from)}週から${p.weeks}週間で${p.n}件`).join("、")}）。メール経由の訪問とは週次でρ=${O.vs_email.rho.toFixed(2)}と連動して見えますが、メール・SNS・注文が同時に急増した1月を除くとρ=${O.vs_email_no_jan.rho.toFixed(2)}で、はっきりしません（メール経由の訪問が最も多かった${md(O.top_email.week)}週の注文は${O.top_email.checkouts}件）。IGリーチとは連動していません（ρ=${O.vs_reach.rho.toFixed(2)}）。どのチャネルが効いたかを分けるには、流入元別の注文と施策ログが必要です。`} : null,
+    rec.length ? {k: sign(rec[rec.length - 1].tx_yoy), t: "店舗の取引数が落ち、1回の買い物は大きくなった",
+     p: `店舗の取引数は前年比で${rec.map(r => `${+r.month.slice(5)}月${sign(r.tx_yoy)}`).join("、")}。客単価は${rec.map(r => sign(r.aov_yoy)).join("・")}と上がっています。同じ品番の価格は（1〜${+S.end.slice(5, 7)}月の通期で）前年比${sign(M.like_for_like_price - 1)}とほぼ据え置きなので、客単価の上昇は他社ブランドや高単価品の比率が上がったためと考えられます。`} : null,
   ].filter(Boolean);
   document.getElementById("mkFindings").innerHTML = cards.map(f =>
     `<div class="finding"><div class="k">${esc(f.k)}</div><div class="t">${esc(f.t)}</div><p>${esc(f.p)}</p></div>`).join("");
@@ -484,24 +486,27 @@ document.getElementById("deadTable").innerHTML = DATA.dead.length ?
 
   // spike table
   document.getElementById("mkSpikes").innerHTML =
-    `<thead><tr><th>週</th><th class="r">IGリーチ</th><th class="r">IG経由の訪問</th><th class="r">訪問率</th><th class="r">ネット注文</th><th>判定</th></tr></thead><tbody>` +
+    `<thead><tr><th>週</th><th class="r">IGリーチ</th><th class="r">IG経由の訪問</th><th class="r">訪問÷リーチ</th><th class="r">ネット注文</th><th class="r">フォロワー増</th><th>平常週と比べて</th></tr></thead><tbody>` +
     ig.spikes.map(x => `<tr><td>${md(x.week)}週</td><td class="r">${x.reach.toLocaleString()}</td><td class="r">${x.ig_sessions.toLocaleString()}</td>` +
-      `<td class="r">${pct(x.rate, 1)}</td><td class="r">${x.checkouts == null ? "未入力" : x.checkouts + "件"}</td><td>${x.converting ? "訪問につながった" : '<span class="down">訪問につながらず</span>'}</td></tr>`).join("") +
-    `<tr><td class="muted">山以外の週の平均</td><td></td><td></td><td class="r">${pct(ig.rest_rate, 1)}</td><td></td><td></td></tr></tbody>`;
+      `<td class="r">${pct(x.rate, 1)}</td><td class="r">${x.checkouts == null ? "未入力" : x.checkouts + "件"}</td><td class="r">${x.net_follow == null ? "–" : "+" + x.net_follow}</td><td>${x.converting ? "平常週以上" : '<span class="down">平常週未満</span>'}</td></tr>`).join("") +
+    `<tr><td class="muted">平常週（山以外）</td><td></td><td></td><td class="r">${pct(ig.rest_rate, 1)}</td><td></td><td></td><td></td></tr></tbody>`;
 
-  const on = M.online.filter(o => o.share >= 0.05), fo = M.follow;
+  const fo = M.follow, big = M.online.filter(o => o.share_low >= 0.1);
+  const q1 = srch.find(x => x.q === 1), q3 = srch.find(x => x.q === 3);
   const imp = [
-    on.length ? `スマレジの売上にはネットストアの売上が入っていません。ネット分は${on.map(o => `${+o.month.slice(5)}月に約${pct(o.share, 0)}`).join("、")}（推定）で、ほかの月は誤差の範囲です。キャンペーンで売れた品番は、この判定では控えめに出ている可能性があります。Shopifyの商品別売上を書き出してもらえれば合算します。` : null,
-    "欠品中の「再生産」「要確認」の品番は、再入荷をメールで告知すると注文につながりやすいです。売り切れの品番をSNSで見せても売上にならないので、露出は在庫がある品番に絞ります。",
-    "新作の告知は、8月のようなリンク付きの投稿・ストーリーズとメールの組み合わせで行います。リーチの数を伸ばす投稿は、訪問にもフォロワーにもつながっていません。",
-    rec.length ? `店舗の客数は直近で前年比${sign(rec[rec.length - 1].tx_yoy)}です。品番の判定は同じ期間の新作と比べる相対評価なので影響を受けにくいですが、再生産の数量は前年並みにせず、直近の売れ方で決めてください。` : null,
-    "トラッカーの「主な施策・投稿・コラボ・PR」欄に品番名を書いてもらえれば、品番ごとに「告知あり・なし」で初速を比べられるようになります。",
+    `スマレジの月次は送料が毎月0円で、ネットストアの注文は入っていないとみられます。Shopifyの総売上（店舗込み）との差から推定すると、ネット分は${big.length ? big.map(o => `${+o.month.slice(5)}月に約${pct(o.share_low, 0)}〜${pct(o.share_high, 0)}`).join("、") : "小さく"}で、ほかの月は売上の定義の差（免税・値引きの扱い）に埋もれて測れません。キャンペーンで売れた品番は、この判定では控えめに出ている可能性があります。Shopifyの商品別売上を書き出してもらえれば合算します。`,
+    `店舗の売上の約9割は訪日客なので、日本語のSNSやメールで届く相手は、主にネットストアと国内のお客さんです。店舗向けの品番判定（再生産・終売）は、SNSの反応ではなく店舗の売れ方で決めるのが妥当です。`,
+    "欠品中の「再生産」「要確認」の品番は、再入荷をメールで告知して、品番別のネット注文で効果を確かめてください（メール経由の訪問と注文の連動は、キャンペーン週以外でははっきりしません）。在庫がない品番は露出しても買えないので、露出は在庫がある品番を優先します。",
+    `ネット注文が伸びた週（${peaks.map(p => md(p.from) + "週〜").join("、")}）に何をしたか（投稿の形式、リンクの有無、メール、どの品番か）を施策ログに残してください。品番ごとに「告知あり・なし」で初速を比べられるようになり、新作の出し方を決める材料になります。`,
+    rec.length ? `店舗の取引数の落ち込みは${rec.filter(r => r.tx_yoy < -0.05).map(r => +r.month.slice(5) + "月").join("・")}に集中しています。その時期に出た新作の粗利を押し下げるため、分岐点ラインがやや甘く（やめにくく）出ている可能性があります。再生産の数量は前年並みにせず、直近の売れ方で決めてください。` : null,
   ].filter(Boolean);
   document.getElementById("mkImplications").innerHTML = imp.map(x => `<li>${esc(x)}</li>`).join("");
   const notes = [
-    `フォロワーは直近13週で週+${fo.pace.toFixed(0)}人のペースです。このままだと年末は約${Math.round(fo.projected).toLocaleString()}人で、2万人に届くには週+${Math.round(fo.needed)}人が必要です。`,
-    M.incomplete_weeks.length ? `${M.incomplete_weeks.map(md).join("・")}週は判定日（${md(S.end)}）時点でまだ終わっていないのに1週間分の値が入っていたため、分析から外しました。入力の行ずれがないか確認してください。` : null,
-    "指名検索は前年の数値がないため、表示回数の減少が季節によるものかはまだ分かりません。Search Consoleには16か月分残っているので、2025年分を書き出してもらえれば前年比で確かめられます。",
+    q1 && q3 ? `指名検索は、表示回数が1〜3月の週${Math.round(q1.impr).toLocaleString()}回から7〜9月の週${Math.round(q3.impr).toLocaleString()}回（${sign(q3.impr / q1.impr - 1)}）に減り、平均掲載順位は${q1.pos.toFixed(1)}位から${q3.pos.toFixed(1)}位に下がりましたが、クリック数は${sign(q3.clicks / q1.clicks - 1)}にとどまっています。前年の数値がないため季節によるものかは分かりません。Search Consoleには16か月分残っているので、2025年分を書き出してもらえれば確かめられます。` : null,
+    `フォロワーは直近13週で週+${fo.pace.toFixed(0)}人のペースです。このままだと年末は約${Math.round(fo.projected).toLocaleString()}人で、2万人に届くには週+${Math.round(fo.needed)}人が必要です（6月以前のフォロワー数は退会を引かない逆算値なので比べていません）。`,
+    M.ig_inconsistent.length ? `元のシートでは、${M.ig_inconsistent.map(md).join("・")}週のIG経由の訪問が、SNS全体の訪問と同じか多くなっています（定義上はSNS全体の一部）。集計期間がずれている可能性があるので、Shopifyの参照元別セッションを週ごとに取り直してください。` : null,
+    M.incomplete_weeks.length ? `${M.incomplete_weeks.map(md).join("・")}週は判定日（${md(S.end)}）時点でまだ終わっていないのに1週間分の値が入っていたため、分析から外しました。行がずれていないか確認してください（ずれていれば${md(M.last_week)}週の値も別の期間の可能性があります）。` : null,
+    "「訪問÷リーチ」はセッション数をリーチ人数で割った値で、訪問した人の割合そのものではありません。",
   ].filter(Boolean);
   document.getElementById("mkNotes").innerHTML = notes.map(x => `<li>${esc(x)}</li>`).join("");
 })();
