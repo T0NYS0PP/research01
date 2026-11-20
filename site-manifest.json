@@ -1,0 +1,20 @@
+{
+  "company": "PLUSPECT",
+  "version": "ba356ca34582",
+  "sourceVersion": "201fe194d9ef",
+  "url": "https://t0nys0pp.github.io/research01/",
+  "pages": [
+    "/",
+    "/about",
+    "/services",
+    "/services/oem",
+    "/services/odm",
+    "/services/materials",
+    "/process",
+    "/contact",
+    "/privacy",
+    "/404"
+  ],
+  "contact": "phone",
+  "emailDelivery": false
+}
