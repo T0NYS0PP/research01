@@ -1,0 +1,90 @@
+/* A shared text rhythm and alignment for phone and tablet layouts. */
+@media (max-width: 809px) {
+  :root { --gutter: clamp(20px, 6.15vw, 28px); }
+
+  .hero { min-height: 640px; }
+  .hero-copy {
+    left: var(--gutter);
+    right: var(--gutter);
+    top: clamp(118px, 18svh, 168px);
+  }
+  .hero h1 {
+    font-size: clamp(40px, 11.5vw, 60px);
+    line-height: 1.06;
+    letter-spacing: -.045em;
+  }
+  .hero-copy p {
+    display: block;
+    margin-top: 20px;
+    font-size: 14px;
+    line-height: 1.85;
+    letter-spacing: .015em;
+  }
+  .hero-copy p i { display: none; }
+  .hero-lead-text { text-wrap: pretty; }
+  .hero-services {
+    margin: 10px 0 0;
+    font-size: 9px;
+    line-height: 1.6;
+    letter-spacing: .08em;
+  }
+  .hero-signature {
+    position: static;
+    width: max-content;
+    max-width: 100%;
+    margin: clamp(48px, 8svh, 84px) 0 0 auto;
+    font-size: clamp(29px, 8vw, 38px);
+    line-height: 1.08;
+    text-align: right;
+  }
+  .hero-bottom { left: var(--gutter); right: var(--gutter); }
+  .hero-baseline { font-size: 8px; line-height: 1.5; gap: 20px; }
+  .cross-grid { inset: 88px var(--gutter) 200px; grid-template-rows: 1fr 1fr; }
+  .cross-grid span:nth-child(n+5) { display: none; }
+  .cross-grid span:nth-child(3), .cross-grid span:nth-child(4) { align-self: end; }
+
+  .section-space { padding-top: 64px; padding-bottom: 64px; }
+  .compact-top { padding-top: 16px; }
+  .eyebrow { margin-bottom: 32px; }
+  .intro-grid { gap: 24px; }
+  .intro-grid h2 { font-size: clamp(28px, 8vw, 36px); line-height: 1.5; letter-spacing: -.035em; }
+  .intro-copy p { font-size: 15px; line-height: 1.95; letter-spacing: .015em; margin-bottom: 24px; }
+  .section-heading { margin-bottom: 32px; }
+  .section-heading h2 { font-size: clamp(36px, 9.6vw, 50px); line-height: 1.16; }
+  .section-heading p { font-size: 14px; line-height: 1.9; margin-top: 20px; }
+  .service-card h4 { font-size: 19px; line-height: 1.6; margin-top: 20px; }
+  .service-card p, .service-panels p, .detail-copy p, .faq-answer {
+    font-size: 14px;
+    line-height: 1.95;
+    letter-spacing: .015em;
+  }
+  .service-showcase .showcase-content p { font-size: 15px; line-height: 1.85; }
+  .film-copy h2 { font-size: clamp(32px, 8.2vw, 52px); line-height: 1.18; }
+
+  .page-heading { padding-top: 114px; padding-bottom: 48px; }
+  .page-heading .eyebrow { margin-bottom: 28px; }
+  .page-heading h1 { font-size: clamp(28px, 8vw, 48px); line-height: 1.45; letter-spacing: -.03em; text-wrap: balance; }
+  .page-heading-bottom { margin-top: 24px; }
+  .page-heading-bottom p { font-size: 15px; line-height: 1.95; letter-spacing: .015em; }
+  .page-heading-bottom .copy-phrase { display: inline-block; }
+  .page-heading-bottom > .serif { font-size: clamp(30px, 8vw, 40px); line-height: 1.18; margin-top: 28px; }
+  .detail-copy h2 { font-size: clamp(25px, 6.8vw, 32px); line-height: 1.6; letter-spacing: -.025em; }
+  .company-profile h2 { font-size: clamp(36px, 10.3vw, 46px); }
+  .company-profile .about-details dl > div { grid-template-columns: 72px minmax(0, 1fr); gap: 16px; line-height: 1.85; }
+  .faq-list summary { align-items: baseline; }
+  .faq-number { flex: 0 0 20px; }
+  .faq-list summary > span:nth-child(2) { flex: 1; line-height: 1.8; }
+  .faq-list summary > i { flex-shrink: 0; }
+  .footer-cta { font-size: clamp(34px, 10vw, 46px); line-height: 1.4; letter-spacing: -.035em; padding-right: 52px; }
+  .footer-caption { margin-bottom: 22px; }
+}
+
+@media (max-width: 480px) {
+  .process-grid { grid-template-columns: 1fr; gap: 28px; }
+  .process-grid li { display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: 16px; row-gap: 8px; align-items: start; padding-top: 24px; border-top: 1px solid var(--line); }
+  .process-grid .step-number { grid-column: 1; grid-row: 1 / span 2; font-size: 34px; line-height: 1.2; margin: 0; }
+  .process-grid .step-number i { font-size: 17px; }
+  .process-grid .step-en { grid-column: 2; min-height: 0; font-size: 11px; line-height: 1.6; }
+  .process-grid h3 { grid-column: 2; font-size: 17px; line-height: 1.6; margin: 0; }
+  .process-grid li > p:last-child { grid-column: 1 / -1; grid-row: 3; margin-top: 4px; font-size: 14px; line-height: 1.9; }
+}
