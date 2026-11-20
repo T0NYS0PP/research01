@@ -77,6 +77,9 @@
   .faq-list summary > i { flex-shrink: 0; }
   .footer-cta { font-size: clamp(34px, 10vw, 46px); line-height: 1.4; letter-spacing: -.035em; padding-right: 52px; }
   .footer-caption { margin-bottom: 22px; }
+  .footer-visual { padding-right: var(--gutter); padding-left: var(--gutter); }
+  .footer-visual > div { width: 100%; min-width: 0; }
+  .footer-visual h2 { font-size: clamp(26px, 9vw, 56px); line-height: 1.6; letter-spacing: -.035em; margin-bottom: 28px; }
 }
 
 @media (max-width: 480px) {
