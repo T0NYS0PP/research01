@@ -1,8 +1,8 @@
 {
   "company": "PLUSPECT",
-  "version": "ba356ca34582",
+  "version": "2ffe23d834bf",
   "sourceVersion": "201fe194d9ef",
-  "url": "https://t0nys0pp.github.io/research01/",
+  "url": "https://rawcdn.githack.com/T0NYS0PP/research01/pluspect-public-20261120-1/",
   "pages": [
     "/",
     "/about",
@@ -16,5 +16,9 @@
     "/404"
   ],
   "contact": "phone",
-  "emailDelivery": false
+  "emailDelivery": false,
+  "sourcePublicVersion": "ba356ca34582",
+  "entryUrl": "https://rawcdn.githack.com/T0NYS0PP/research01/pluspect-public-20261120-1/index.html",
+  "fileUrls": true,
+  "gitTag": "pluspect-public-20261120-1"
 }
