@@ -77,7 +77,7 @@
     animate(container,[{height:oldHeight+'px'},{height:newHeight+'px'}],{duration:450,easing:settings.text.ease});
     animate(panel,[{opacity:0,transform:'translateY(18px)'},{opacity:1,transform:'translateY(0)'}],{duration:600,easing:settings.text.ease});
     const photo=document.querySelector('.consult-photo img');
-    if(photo){const src=tab.dataset.image;animate(photo,[{opacity:1},{opacity:0}],{duration:150}).then(()=>{if(token!==tabToken)return;photo.src=src;animate(photo,[{opacity:0,transform:'scale(1.3)'},{opacity:1,transform:'scale(1)'}],{duration:800,easing:settings.text.ease});});}
+    if(photo){const src=tab.dataset.image;animate(photo,[{opacity:1},{opacity:0}],{duration:150}).then(()=>{if(token!==tabToken)return;photo.src=src;photo.alt=tab.dataset.imageAlt||photo.alt;animate(photo,[{opacity:0,transform:'scale(1.3)'},{opacity:1,transform:'scale(1)'}],{duration:800,easing:settings.text.ease});});}
   }
   tabs.forEach((tab,index)=>{
     tab.addEventListener('click',()=>selectTab(tab));
